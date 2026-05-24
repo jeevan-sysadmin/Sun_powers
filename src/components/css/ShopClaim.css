@@ -39,6 +39,12 @@
   font-size: 24px;
 }
 
+.shop-claim-section .stat-icon.total,
+.shop-claim-tab .stat-icon.total {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 45%, #0ea5e9 100%);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.34);
+}
+
 .stat-info h3 {
   font-size: 28px;
   font-weight: 700;

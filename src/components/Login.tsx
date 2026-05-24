@@ -601,12 +601,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
         .btn-login {
           width: 100%;
-          padding: 18px;
+          height: 52px;
+          padding: 0 18px;
           background: linear-gradient(135deg, #FFD700 0%, #FF8C00 100%);
           border: none;
           border-radius: 12px;
           color: #000;
-          font-size: 1.1rem;
+          font-size: 1rem;
           font-weight: 600;
           cursor: pointer;
           display: flex;
@@ -624,6 +625,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         .btn-login:disabled {
           opacity: 0.7;
           cursor: not-allowed;
+        }
+
+        @media (max-width: 480px) {
+          .btn-login {
+            height: 48px;
+            font-size: 0.95rem;
+          }
         }
 
         .spinner {

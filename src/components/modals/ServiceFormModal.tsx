@@ -100,6 +100,8 @@ interface ServiceForm {
   customer_id: number | null;
   customer_phone: string;
   battery_id: number | null;
+  original_battery_ids?: string;
+  original_battery_serials?: string;
   issue_description: string;
   status: string;
   warranty_status: string;
@@ -222,6 +224,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   const [showSpareBatteryDropdown, setShowSpareBatteryDropdown] = useState(false);
   const [selectedSpareBattery, setSelectedSpareBattery] = useState<SpareBattery | null>(null);
   const [selectedOriginalBattery, setSelectedOriginalBattery] = useState<Battery | null>(null);
+  const [selectedOriginalBatteries, setSelectedOriginalBatteries] = useState<Battery[]>([]);
   
   const customerDropdownRef = useRef<HTMLDivElement>(null);
   const batteryDropdownRef = useRef<HTMLDivElement>(null);
@@ -260,7 +263,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
     battery.battery_model.toLowerCase().includes(batterySearch.toLowerCase()) ||
     battery.battery_serial.toLowerCase().includes(batterySearch.toLowerCase()) ||
     battery.brand.toLowerCase().includes(batterySearch.toLowerCase())
-  );
+  ).filter(battery => !selectedOriginalBatteries.some(selected => selected.id === battery.id));
 
   const filteredStaff = localStaff.filter(staff => 
     staff.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
@@ -553,19 +556,42 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
 
   // Handle original battery selection
   const handleBatterySelect = (battery: Battery) => {
-    setSelectedOriginalBattery(battery);
-    
-    const event = {
-      target: {
-        name: 'battery_id',
-        value: battery.id.toString()
-      }
-    } as React.ChangeEvent<HTMLSelectElement>;
-    onServiceInputChange(event);
+    setSelectedOriginalBatteries(prev => {
+      const exists = prev.some(item => item.id === battery.id);
+      const next = exists ? prev : [...prev, battery];
+      const primary = next[0] || null;
+      setSelectedOriginalBattery(primary);
 
-    setBatterySearch(`${battery.battery_model} - ${battery.battery_serial}`);
-    setShowBatteryDropdown(false);
-    setSuccessMessage(`Selected original battery: ${battery.battery_model}`);
+      const batteryEvent = {
+        target: {
+          name: 'battery_id',
+          value: primary ? primary.id.toString() : ''
+        }
+      } as React.ChangeEvent<HTMLSelectElement>;
+      onServiceInputChange(batteryEvent);
+
+      const idsEvent = {
+        target: {
+          name: 'original_battery_ids',
+          value: next.map(item => item.id).join(',')
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      onServiceInputChange(idsEvent);
+
+      const serialsEvent = {
+        target: {
+          name: 'original_battery_serials',
+          value: next.map(item => item.battery_serial).join(', ')
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      onServiceInputChange(serialsEvent);
+
+      return next;
+    });
+
+    setBatterySearch('');
+    setShowBatteryDropdown(true);
+    setSuccessMessage(`Added original battery: ${battery.battery_model}`);
     setTimeout(() => setSuccessMessage(null), 2000);
   };
 
@@ -614,15 +640,38 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   };
 
   // Remove original battery selection
-  const handleRemoveOriginalBattery = () => {
-    setSelectedOriginalBattery(null);
-    const batteryEvent = {
-      target: {
-        name: 'battery_id',
-        value: ''
-      }
-    } as React.ChangeEvent<HTMLSelectElement>;
-    onServiceInputChange(batteryEvent);
+  const handleRemoveOriginalBattery = (batteryId: number) => {
+    setSelectedOriginalBatteries(prev => {
+      const next = prev.filter(item => item.id !== batteryId);
+      const primary = next[0] || null;
+      setSelectedOriginalBattery(primary);
+
+      const batteryEvent = {
+        target: {
+          name: 'battery_id',
+          value: primary ? primary.id.toString() : ''
+        }
+      } as React.ChangeEvent<HTMLSelectElement>;
+      onServiceInputChange(batteryEvent);
+
+      const idsEvent = {
+        target: {
+          name: 'original_battery_ids',
+          value: next.map(item => item.id).join(',')
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      onServiceInputChange(idsEvent);
+
+      const serialsEvent = {
+        target: {
+          name: 'original_battery_serials',
+          value: next.map(item => item.battery_serial).join(', ')
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      onServiceInputChange(serialsEvent);
+
+      return next;
+    });
     setBatterySearch('');
 
     setSuccessMessage('Original battery removed');
@@ -658,6 +707,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   // Reset all battery selections
   const handleResetAllSelections = () => {
     setSelectedOriginalBattery(null);
+    setSelectedOriginalBatteries([]);
     setSelectedSpareBattery(null);
     
     const batteryEvent = {
@@ -667,6 +717,20 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       }
     } as React.ChangeEvent<HTMLSelectElement>;
     onServiceInputChange(batteryEvent);
+    const idsEvent = {
+      target: {
+        name: 'original_battery_ids',
+        value: ''
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onServiceInputChange(idsEvent);
+    const serialsEvent = {
+      target: {
+        name: 'original_battery_serials',
+        value: ''
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onServiceInputChange(serialsEvent);
     setBatterySearch('');
 
     const spareIdEvent = {
@@ -728,22 +792,49 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                   setCustomerSearch(serviceData.customer_name);
                 }
                 
-                // Set battery search - Original Battery - FIXED
-                if (serviceData.battery_id && localBatteries.length > 0) {
-                  // Find the battery in localBatteries
-                  const foundBattery = localBatteries.find(b => b.id === parseInt(serviceData.battery_id));
-                  if (foundBattery) {
-                    setSelectedOriginalBattery(foundBattery);
-                    setBatterySearch(`${foundBattery.battery_model} - ${foundBattery.battery_serial}`);
-                    
-                    // Also ensure the form has the battery_id set
+                // Set original battery selections
+                if (localBatteries.length > 0) {
+                  const idTokens = `${serviceData.original_battery_ids || ''}`
+                    .split(',')
+                    .map((token: string) => parseInt(token.trim()))
+                    .filter((num: number) => !Number.isNaN(num));
+
+                  const fallbackId = serviceData.battery_id ? parseInt(serviceData.battery_id) : null;
+                  if (idTokens.length === 0 && fallbackId) {
+                    idTokens.push(fallbackId);
+                  }
+
+                  const foundBatteries = idTokens
+                    .map((id: number) => localBatteries.find(b => b.id === id))
+                    .filter(Boolean) as Battery[];
+
+                  if (foundBatteries.length > 0) {
+                    setSelectedOriginalBatteries(foundBatteries);
+                    setSelectedOriginalBattery(foundBatteries[0]);
+
                     const batteryEvent = {
                       target: {
                         name: 'battery_id',
-                        value: foundBattery.id.toString()
+                        value: foundBatteries[0].id.toString()
                       }
                     } as React.ChangeEvent<HTMLSelectElement>;
                     onServiceInputChange(batteryEvent);
+
+                    const idsEvent = {
+                      target: {
+                        name: 'original_battery_ids',
+                        value: foundBatteries.map(item => item.id).join(',')
+                      }
+                    } as React.ChangeEvent<HTMLInputElement>;
+                    onServiceInputChange(idsEvent);
+
+                    const serialsEvent = {
+                      target: {
+                        name: 'original_battery_serials',
+                        value: foundBatteries.map(item => item.battery_serial).join(', ')
+                      }
+                    } as React.ChangeEvent<HTMLInputElement>;
+                    onServiceInputChange(serialsEvent);
                   }
                 }
                 
@@ -813,6 +904,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       setSpareBatterySearch('');
       setSelectedSpareBattery(null);
       setSelectedOriginalBattery(null);
+      setSelectedOriginalBatteries([]);
       setError(null);
       setSuccessMessage(null);
     }
@@ -1121,8 +1213,11 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
             color: '#334155',
             fontSize: isMobile ? '13px' : '14px'
           }}>
-            <FiBattery style={{ marginRight: '6px', color: '#10b981' }} /> Select Original Battery
+            <FiBattery style={{ marginRight: '6px', color: '#10b981' }} /> Select Original Battery(s)
           </label>
+          <div style={{ fontSize: isMobile ? '11px' : '12px', color: '#64748b', marginBottom: '6px' }}>
+            You can select multiple batteries one by one. Selected: {selectedOriginalBatteries.length}
+          </div>
           <div style={{ position: 'relative' }}>
             <input
               type="text"
@@ -1200,35 +1295,44 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               ))}
             </div>
           )}
-          {selectedOriginalBattery && (
+          {selectedOriginalBatteries.length > 0 && (
             <div style={{
               marginTop: '8px',
-              padding: isMobile ? '6px 10px' : '8px 12px',
-              background: '#dbeafe',
-              borderRadius: '6px',
-              fontSize: isMobile ? '12px' : '13px',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
+              flexWrap: 'wrap',
+              gap: '8px'
             }}>
-              <span>
-                <strong>Selected:</strong> {selectedOriginalBattery.battery_model} - {selectedOriginalBattery.battery_serial}
-              </span>
-              <button
-                type="button"
-                onClick={handleRemoveOriginalBattery}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#ef4444',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  padding: '0 4px'
-                }}
-                title="Remove original battery"
-              >
-                ×
-              </button>
+              {selectedOriginalBatteries.map((battery) => (
+                <div
+                  key={battery.id}
+                  style={{
+                    padding: isMobile ? '6px 10px' : '8px 12px',
+                    background: '#dbeafe',
+                    borderRadius: '999px',
+                    fontSize: isMobile ? '12px' : '13px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                  <span>{battery.battery_model} - {battery.battery_serial}</span>
+                  <button
+                    type='button'
+                    onClick={() => handleRemoveOriginalBattery(battery.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      padding: 0,
+                      lineHeight: 1
+                    }}
+                    title='Remove original battery'
+                  >
+                    x
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -1386,7 +1490,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       </div>
 
       {/* Selected Batteries Summary */}
-      {(selectedOriginalBattery || selectedSpareBattery) && (
+      {(selectedOriginalBatteries.length > 0 || selectedSpareBattery) && (
         <div style={{
           marginTop: isMobile ? '16px' : '20px',
           padding: isMobile ? '10px 12px' : '12px 16px',
@@ -1398,9 +1502,9 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
             Selected Batteries:
           </h4>
           <ul style={{ margin: 0, paddingLeft: '20px', color: '#0c4a6e', fontSize: isMobile ? '12px' : '13px' }}>
-            {selectedOriginalBattery && (
+            {selectedOriginalBatteries.length > 0 && (
               <li>
-                <strong>Original Battery:</strong> {selectedOriginalBattery.battery_model} - {selectedOriginalBattery.battery_serial}
+                <strong>Original Batteries:</strong> {selectedOriginalBatteries.map((battery) => `${battery.battery_model} - ${battery.battery_serial}`).join(', ')}
               </li>
             )}
             {selectedSpareBattery && (
@@ -1416,7 +1520,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       )}
 
       {/* Reset All Button */}
-      {(selectedOriginalBattery || selectedSpareBattery) && (
+      {(selectedOriginalBatteries.length > 0 || selectedSpareBattery) && (
         <div style={{ marginTop: '12px', textAlign: 'center' }}>
           <motion.button
             type="button"

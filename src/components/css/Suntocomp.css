@@ -5,6 +5,13 @@
   padding: 20px;
 }
 
+.suntocomp-tab .stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
 .stats-overview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -773,6 +780,10 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .suntocomp-tab .stats-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .stats-overview {
     grid-template-columns: 1fr;
   }
@@ -1669,5 +1680,88 @@
   @page {
     size: landscape;
     margin: 0.5in;
+  }
+}
+
+/* Compact stats cards for SunToComp + CompToSun pages */
+.suntocomp-section .stats-cards,
+.comptosun-section .stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.suntocomp-section .stat-card,
+.comptosun-section .stat-card {
+  padding: 12px;
+  gap: 10px;
+  border-radius: 10px;
+  min-height: 74px;
+}
+
+.suntocomp-section .stat-icon,
+.comptosun-section .stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.suntocomp-section .stat-icon.total,
+.comptosun-section .stat-icon.total {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.28);
+}
+
+.suntocomp-section .stat-icon.scheduled,
+.comptosun-section .stat-icon.scheduled {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 6px 14px rgba(5, 150, 105, 0.28);
+}
+
+.suntocomp-section .stat-icon.delivered,
+.comptosun-section .stat-icon.delivered {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 6px 14px rgba(217, 119, 6, 0.28);
+}
+
+.suntocomp-section .stat-icon.dispatched,
+.comptosun-section .stat-icon.dispatched {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 6px 14px rgba(124, 58, 237, 0.28);
+}
+
+.suntocomp-section .stat-content h3,
+.comptosun-section .stat-content h3 {
+  font-size: 20px;
+  margin: 0 0 2px 0;
+  line-height: 1.1;
+}
+
+.suntocomp-section .stat-content p,
+.comptosun-section .stat-content p {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+@media (max-width: 768px) {
+  .suntocomp-section .stats-cards,
+  .comptosun-section .stats-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .suntocomp-section .stats-cards,
+  .comptosun-section .stats-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .suntocomp-tab .stats-cards {
+    grid-template-columns: 1fr;
   }
 }

@@ -48,6 +48,8 @@ interface ServiceOrder {
   customer_address?: string;
   battery_model: string;
   battery_serial: string;
+  original_battery_ids?: string;
+  original_battery_serials?: string;
   inverter_model: string;
   inverter_serial: string;
   issue_description: string;
@@ -162,6 +164,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
     { value: 'today', label: 'Today' },
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
+    { value: 'last_month', label: 'Last Month' },
     { value: 'year', label: 'This Year' },
     { value: 'custom', label: 'Custom Range' }
   ];
@@ -194,6 +197,8 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         service.customer_name.toLowerCase().includes(term) ||
         service.customer_phone.includes(term) ||
         service.battery_model?.toLowerCase().includes(term) ||
+        service.original_battery_ids?.toLowerCase().includes(term) ||
+        service.original_battery_serials?.toLowerCase().includes(term) ||
         service.battery_serial?.toLowerCase().includes(term) ||
         service.inverter_model?.toLowerCase().includes(term) ||
         service.issue_description?.toLowerCase().includes(term)
@@ -242,6 +247,13 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           const serviceDate = service.service_date ? new Date(service.service_date) : new Date(service.created_at);
           return serviceDate.getMonth() === today.getMonth() && 
                  serviceDate.getFullYear() === today.getFullYear();
+        });
+      case 'last_month':
+        return data.filter(service => {
+          const serviceDate = service.service_date ? new Date(service.service_date) : new Date(service.created_at);
+          const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          return serviceDate.getMonth() === lastMonthDate.getMonth() &&
+                 serviceDate.getFullYear() === lastMonthDate.getFullYear();
         });
 
       case 'year':
@@ -306,6 +318,21 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
     setSearchTerm('');
   };
 
+  const getPendingText = (service: ServiceOrder): string => {
+    const status = (service.status || '').toLowerCase();
+    if (status === 'delivered') return 'Delivered';
+    if (status === 'completed') return 'Completed';
+    if (status === 'cancelled') return 'Cancelled';
+
+    const baseDate = service.service_date ? new Date(service.service_date) : new Date(service.created_at);
+    if (Number.isNaN(baseDate.getTime())) return 'N/A';
+
+    const now = new Date();
+    const diffMs = now.getTime() - baseDate.getTime();
+    const days = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    return days === 0 ? 'Today' : `${days} day${days > 1 ? 's' : ''}`;
+  };
+
   const getDateRangeText = (): string => {
     switch (dateFilterType) {
       case 'today':
@@ -320,6 +347,10 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
       }
       case 'month':
         return `${monthOptions.find(m => m.value === selectedMonth)?.label} ${selectedYear}`;
+      case 'last_month': {
+        const lastMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+        return `Last Month (${lastMonthDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})`;
+      }
       case 'year':
         return `Year ${selectedYear}`;
       case 'custom':
@@ -483,7 +514,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         service.customer_email || 'N/A',
         service.customer_address || 'N/A',
         service.battery_model || 'N/A',
-        service.battery_serial || 'N/A',
+        service.original_battery_serials || service.battery_serial || 'N/A',
         service.inverter_model || 'N/A',
         service.inverter_serial || 'N/A',
         service.issue_description || 'N/A',
@@ -634,7 +665,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(0, 0, 0);
       doc.text(service.battery_model || 'N/A', col2X, startY);
-      doc.text(service.battery_serial || 'N/A', col2X, startY + 7);
+      doc.text(service.original_battery_serials || service.battery_serial || 'N/A', col2X, startY + 7);
       doc.text(service.inverter_model || 'N/A', col2X, startY + 14);
       doc.text(service.inverter_serial || 'N/A', col2X, startY + 21);
 
@@ -1034,7 +1065,67 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
   };
 
   const getEquipmentSerial = (service: ServiceOrder) => {
-    return service.battery_serial || service.inverter_serial || '';
+    return service.original_battery_serials || service.battery_serial || service.inverter_serial || '';
+  };
+
+  const getEquipmentItems = (service: ServiceOrder) => {
+    const cleanToken = (value: string) =>
+      value
+        .replace(/original_battery_ids/gi, '')
+        .replace(/original_battery_serials/gi, '')
+        .replace(/[{}[\]"]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const parseList = (raw: string) =>
+      `${raw || ''}`
+        .split(',')
+        .map(token => token.includes(':') ? token.split(':').slice(1).join(':') : token)
+        .map(token => cleanToken(token))
+        .filter(Boolean);
+
+    const baseModel = service.battery_model || service.inverter_model || 'Equipment';
+    const models = parseList(service.battery_model || '');
+    const serialSource = service.original_battery_serials || service.battery_serial || service.inverter_serial || '';
+    const serials = parseList(serialSource);
+
+    const itemCount = Math.max(serials.length, models.length, 1);
+
+    if (itemCount === 1 && serials.length === 0 && models.length === 0) {
+      return [{ model: baseModel, serial: 'N/A' }];
+    }
+
+    return Array.from({ length: itemCount }).map((_, index) => ({
+      model: models[index] || models[0] || baseModel,
+      serial: serials[index] || serials[0] || 'N/A'
+    }));
+  };
+
+  const renderEquipmentList = (service: ServiceOrder, compact: boolean = false) => {
+    const items = getEquipmentItems(service);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? '4px' : '6px' }}>
+        {items.map((item, index) => (
+          <div
+            key={`${service.id}-equip-${index}`}
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: compact ? '4px 6px' : '6px 8px',
+              minWidth: compact ? '180px' : '220px'
+            }}
+          >
+            <div style={{ fontSize: compact ? '10px' : '11px', fontWeight: 600, color: '#0f172a' }}>
+              {index + 1}. {item.model}
+            </div>
+            <div style={{ fontSize: compact ? '10px' : '11px', color: '#64748b', fontFamily: 'monospace' }}>
+              {item.serial}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const getPageNumbers = () => {
@@ -1147,8 +1238,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           
           <div>
             <div style={{ fontSize: '11px', color: '#64748b' }}>Equipment</div>
-            <div style={{ fontSize: '13px', fontWeight: '500' }}>{getEquipmentModel(service)}</div>
-            <div style={{ fontSize: '11px', color: '#64748b' }}>{getEquipmentSerial(service)}</div>
+            {renderEquipmentList(service)}
           </div>
         </div>
         
@@ -1198,6 +1288,13 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
             {formatCurrency(service.final_cost || service.estimated_cost)}
           </span>
         </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <span style={{ fontSize: '12px', color: '#64748b' }}>Pending:</span>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: (service.status || '').toLowerCase() === 'delivered' ? '#059669' : '#b45309' }}>
+            {getPendingText(service)}
+          </span>
+        </div>
         
         {/* Expanded Content */}
         {isExpanded && (
@@ -1220,7 +1317,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
             {service.battery_model && (
               <div style={{ marginBottom: '12px' }}>
                 <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Battery Details</div>
-                <div style={{ fontSize: '13px' }}>{service.battery_model} - {service.battery_serial}</div>
+                {renderEquipmentList(service)}
               </div>
             )}
             
@@ -1320,10 +1417,14 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           
           <motion.button 
             className="action-btn delete"
+            type="button"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onDeleteService(service.id);
             }}
+            title="Delete Service"
+            aria-label={`Delete ${service.service_code}`}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             style={{
@@ -1385,13 +1486,8 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         <td>
           <div className="product-cell">
             {getEquipmentIcon(service)}
-            <div className="equipment-info">
-              <span className="equipment-model" style={{ fontSize: '11px' }}>
-                {getEquipmentModel(service)}
-              </span>
-              <span className="equipment-serial" style={{ fontSize: '9px' }}>
-                {getEquipmentSerial(service)}
-              </span>
+            <div className="equipment-info" style={{ maxHeight: '110px', overflowY: 'auto', paddingRight: '4px' }}>
+              {renderEquipmentList(service, true)}
             </div>
           </div>
         </td>
@@ -1416,7 +1512,16 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           </span>
         </td>
         <td>
-          <div className="action-buttons" style={{ gap: '4px' }}>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: (service.status || '').toLowerCase() === 'delivered' ? '#059669' : '#b45309'
+          }}>
+            {getPendingText(service)}
+          </span>
+        </td>
+        <td>
+          <div className="action-buttons" style={{ gap: '4px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <motion.button 
               className="action-btn view"
               onClick={(e) => {
@@ -1439,10 +1544,14 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
             </motion.button>
             <motion.button 
               className="action-btn delete"
+              type="button"
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onDeleteService(service.id);
               }}
+              title="Delete Service"
+              aria-label={`Delete ${service.service_code}`}
               style={{ width: '28px', height: '28px' }}
             >
               <FiTrash2 size={14} />
@@ -1983,12 +2092,14 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           <button className="clear-filters" onClick={clearFilters} style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
-            padding: '6px 12px',
-            background: 'none',
-            border: '1px solid #bfdbfe',
-            borderRadius: '6px',
-            color: '#1e40af',
+            gap: '6px',
+            padding: '8px 14px',
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+            border: '1px solid #b91c1c',
+            borderRadius: '10px',
+            color: '#ffffff',
+            fontWeight: 700,
+            boxShadow: '0 6px 14px rgba(220, 38, 38, 0.25)',
             cursor: 'pointer'
           }}>
             <FiX size={14} />
@@ -2081,6 +2192,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Payment</th>
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Amount</th>
                       {!isTablet && <th style={{ padding: '16px' }}>Service Date</th>}
+                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Pending</th>
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Actions</th>
                     </tr>
                   </thead>
@@ -2125,18 +2237,13 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                             <td>
                               <div className="product-cell">
                                 {getEquipmentIcon(service)}
-                                <div className="equipment-info">
-                                  <span className="equipment-model">
-                                    {getEquipmentModel(service)}
-                                  </span>
-                                  <span className="equipment-serial">
-                                    {getEquipmentSerial(service)}
-                                  </span>
+                                <div className="equipment-info" style={{ maxHeight: '110px', overflowY: 'auto', paddingRight: '4px' }}>
+                                  {renderEquipmentList(service, true)}
                                 </div>
                               </div>
                             </td>
                             <td>
-                              <span className="issue-description">
+                              <span className="issue-description" style={{ display: 'inline-block', maxWidth: '280px', lineHeight: 1.4, color: '#ffffff' }}>
                                 {service.issue_description && service.issue_description.length > 50 
                                   ? `${service.issue_description.substring(0, 50)}...`
                                   : service.issue_description || 'No description'}
@@ -2192,7 +2299,16 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                               </div>
                             </td>
                             <td>
-                              <div className="action-buttons">
+                                <span style={{
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  color: (service.status || '').toLowerCase() === 'delivered' ? '#059669' : '#b45309'
+                                }}>
+                                  {getPendingText(service)}
+                                </span>
+                            </td>
+                            <td>
+                              <div className="action-buttons" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: '6px' }}>
                                 <motion.button 
                                   className="action-btn view"
                                   onClick={(e) => {
@@ -2201,6 +2317,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                                   }}
                                   whileHover={{ scale: 1.1 }}
                                   whileTap={{ scale: 0.9 }}
+                                  style={{ width: '32px', height: '32px' }}
                                 >
                                   <FiEye />
                                 </motion.button>
@@ -2212,6 +2329,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                                   }}
                                   whileHover={{ scale: 1.1 }}
                                   whileTap={{ scale: 0.9 }}
+                                  style={{ width: '32px', height: '32px' }}
                                 >
                                   <FiEdit />
                                 </motion.button>
@@ -2223,17 +2341,23 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                                   }}
                                   whileHover={{ scale: 1.1 }}
                                   whileTap={{ scale: 0.9 }}
+                                  style={{ width: '32px', height: '32px' }}
                                 >
                                   <FiPrinter />
                                 </motion.button>
                                 <motion.button 
                                   className="action-btn delete"
+                                  type="button"
                                   onClick={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
                                     onDeleteService(service.id);
                                   }}
+                                  title="Delete Service"
+                                  aria-label={`Delete ${service.service_code}`}
                                   whileHover={{ scale: 1.1 }}
                                   whileTap={{ scale: 0.9 }}
+                                  style={{ width: '32px', height: '32px' }}
                                 >
                                   <FiTrash2 />
                                 </motion.button>
@@ -2265,7 +2389,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
               <FiShoppingBag className="empty-icon" style={{ fontSize: isMobile ? '40px' : '48px', color: '#94a3b8' }} />
               <h3 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem' }}>No service orders found</h3>
               <p style={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>Try adjusting your filters or create a new service order</p>
-              {/* Removed the "Create New Service Order" button from empty state */}
+              {/* Removed the "New Service Order" button from empty state */}
             </div>
           )}
         </div>

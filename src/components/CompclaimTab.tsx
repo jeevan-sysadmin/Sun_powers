@@ -214,6 +214,7 @@ const CompclaimTab: React.FC<CompclaimTabProps> = ({
     { value: 'today', label: 'Today' },
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
+    { value: 'last_month', label: 'Last Month' },
     { value: 'year', label: 'This Year' },
     { value: 'custom', label: 'Custom Range' }
   ];
@@ -329,6 +330,11 @@ const CompclaimTab: React.FC<CompclaimTabProps> = ({
       case "month":
         return claimDate.getMonth() === today.getMonth() && 
                claimDate.getFullYear() === today.getFullYear();
+      case "last_month": {
+        const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return claimDate.getMonth() === lastMonthDate.getMonth() &&
+               claimDate.getFullYear() === lastMonthDate.getFullYear();
+      }
       case "year":
         return claimDate.getFullYear() === selectedYear;
       case "custom":
@@ -532,6 +538,10 @@ const CompclaimTab: React.FC<CompclaimTabProps> = ({
       }
       case 'month':
         return `${monthOptions.find(m => m.value === selectedMonth)?.label} ${selectedYear}`;
+      case 'last_month': {
+        const lastMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+        return `Last Month (${lastMonthDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})`;
+      }
       case 'year':
         return `Year ${selectedYear}`;
       case 'custom':

@@ -119,6 +119,9 @@ interface ServiceOrder {
   notes: string;
   customer_id?: number;
   battery_id?: number;
+  original_battery_ids?: string;
+  original_battery_serials?: string;
+  original_battery_models?: string;
   inverter_id?: number;
   service_staff_id?: number;
   service_staff_name?: string;
@@ -321,6 +324,14 @@ interface Activity {
   timestamp: string;
 }
 
+interface AppNotification {
+  id: number;
+  type: 'success' | 'error' | 'info';
+  message: string;
+  time: string;
+  read: boolean;
+}
+
 interface ApiResponse {
   success: boolean;
   message?: string;
@@ -404,6 +415,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([
+    {
+      id: Date.now(),
+      type: 'info',
+      message: 'Welcome to Sun Powers dashboard',
+      time: new Date().toLocaleTimeString(),
+      read: false
+    }
+  ]);
+  const [showNotifications, setShowNotifications] = useState<boolean>(false);
   
   // Data states
   const [selectedService, setSelectedService] = useState<ServiceOrder | null>(null);
@@ -475,6 +496,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     customer_phone: "",
     inverter_id: null as number | null,
     battery_id: null as number | null,
+    original_battery_ids: "",
+    original_battery_serials: "",
     service_type: "battery_service",
     issue_description: "",
     battery_claim: "none",
@@ -525,6 +548,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   
   // Refs
   const dashboardContentRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const lastSuccessRef = useRef<string | null>(null);
+  const lastErrorRef = useRef<string | null>(null);
+
+  const addNotification = (type: 'success' | 'error' | 'info', message: string) => {
+    setNotifications(prev => [
+      {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        type,
+        message,
+        time: new Date().toLocaleTimeString(),
+        read: false
+      },
+      ...prev
+    ].slice(0, 20));
+  };
   
   // Load user data from localStorage on component mount
   useEffect(() => {
@@ -613,6 +652,46 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     
     loadUserData();
   }, [onLogout]);
+
+  useEffect(() => {
+    if (successMessage && successMessage !== lastSuccessRef.current) {
+      addNotification('success', successMessage);
+      lastSuccessRef.current = successMessage;
+    }
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (error && error !== lastErrorRef.current) {
+      addNotification('error', error);
+      lastErrorRef.current = error;
+    }
+  }, [error]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAllNotificationsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    setShowNotifications(false);
+  };
+
+  const markNotificationRead = (id: number) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
   
   // Effects
   useEffect(() => {
@@ -783,6 +862,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             service_type: service.service_type || '',
             battery_model: service.battery_model || '',
             battery_serial: service.battery_serial || '',
+            original_battery_ids: service.original_battery_ids || '',
+            original_battery_serials: service.original_battery_serials || '',
+            original_battery_models: service.original_battery_models || service.battery_model || '',
             inverter_model: service.inverter_model || '',
             inverter_serial: service.inverter_serial || '',
             issue_description: service.issue_description || '',
@@ -855,6 +937,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           service_type: service.service_type || '',
           battery_model: service.battery_model || '',
           battery_serial: service.battery_serial || '',
+          original_battery_ids: service.original_battery_ids || '',
+          original_battery_serials: service.original_battery_serials || '',
+          original_battery_models: service.original_battery_models || service.battery_model || '',
           inverter_model: service.inverter_model || '',
           inverter_serial: service.inverter_serial || '',
           issue_description: service.issue_description || '',
@@ -1615,6 +1700,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       customer_phone: service.customer_phone || "",
       inverter_id: service.inverter_id || null,
       battery_id: service.battery_id || null,
+      original_battery_ids: service.original_battery_ids || (service.battery_id ? `${service.battery_id}` : ""),
+      original_battery_serials: service.original_battery_serials || service.battery_serial || "",
+      original_battery_models: service.original_battery_models || service.battery_model || "",
       service_type: service.service_type || "battery_service",
       issue_description: service.issue_description || "",
       battery_claim: service.battery_claim || "none",
@@ -1666,6 +1754,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       customer_phone: "",
       inverter_id: null,
       battery_id: null,
+      original_battery_ids: "",
+      original_battery_serials: "",
       service_type: "battery_service",
       issue_description: "",
       battery_claim: "none",
@@ -1730,6 +1820,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         customer_id: serviceForm.customer_id || "",
         customer_phone: serviceForm.customer_phone || "",
         battery_id: serviceForm.battery_id || "",
+        original_battery_ids: serviceForm.original_battery_ids || "",
+        original_battery_serials: serviceForm.original_battery_serials || "",
         service_type: "battery_service",
         issue_description: serviceForm.issue_description || "",
         battery_claim: serviceForm.battery_claim || "none",
@@ -2336,40 +2428,96 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       setError(null);
       
       const url = `${API_BASE_URL}/batteries.php`;
-      const method = isEdit ? 'PUT' : 'POST';
       
-      const dataToSend = {
+      const baseDataToSend = {
         ...batteryData,
         is_spare: parseIsSpare(batteryData.is_spare),
         action: isEdit ? "update" : "create"
       };
       
       if (isEdit) {
-        dataToSend.id = batteryData.id;
+        baseDataToSend.id = batteryData.id;
       }
-      
+
+      const sendBatteryRequest = async (payload: any, method: 'POST' | 'PUT') => {
+        const response = await fetch(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams(payload).toString()
+        });
+
+        const responseText = await response.text();
+        console.log("Raw response:", responseText);
+
+        let data: ApiResponse;
+        try {
+          data = JSON.parse(responseText);
+        } catch (jsonError) {
+          console.error('Failed to parse JSON:', jsonError);
+          console.error('Response was:', responseText);
+          throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 200)}`);
+        }
+
+        return data;
+      };
+
+      const serialNumbers = !isEdit && Array.isArray(batteryData.serial_numbers)
+        ? batteryData.serial_numbers
+            .map((serial: any) => `${serial}`.trim())
+            .filter((serial: string) => !!serial)
+        : [];
+
+      if (!isEdit && serialNumbers.length > 0) {
+        const failedSerials: string[] = [];
+
+        for (const serial of serialNumbers) {
+          try {
+            const payload = {
+              ...baseDataToSend,
+              battery_serial: serial
+            };
+            delete payload.serial_numbers;
+
+            const data = await sendBatteryRequest(payload, 'POST');
+            if (!data.success) {
+              failedSerials.push(serial);
+            }
+          } catch (err) {
+            console.error(`Error saving serial ${serial}:`, err);
+            failedSerials.push(serial);
+          }
+        }
+
+        const successCount = serialNumbers.length - failedSerials.length;
+        if (successCount === 0) {
+          throw new Error('Failed to save all serial numbers');
+        }
+
+        await loadBatteries();
+        setShowProductForm(false);
+        setSelectedBattery(null);
+        setSuccessMessage(
+          failedSerials.length === 0
+            ? `${successCount} batteries added successfully!`
+            : `${successCount} batteries added, ${failedSerials.length} failed.`
+        );
+        setTimeout(() => setSuccessMessage(null), 4000);
+
+        if (failedSerials.length > 0) {
+          setError(`Failed serial numbers: ${failedSerials.join(', ')}`);
+        }
+        return;
+      }
+
+      const dataToSend = { ...baseDataToSend };
+      delete dataToSend.serial_numbers;
+
       console.log("Sending battery data:", dataToSend);
-      
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams(dataToSend).toString()
-      });
-      
-      const responseText = await response.text();
-      console.log("Raw response:", responseText);
-      
-      let data: ApiResponse;
-      try {
-        data = JSON.parse(responseText);
-      } catch (jsonError) {
-        console.error('Failed to parse JSON:', jsonError);
-        console.error('Response was:', responseText);
-        throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 200)}`);
-      }
-      
+
+      const data = await sendBatteryRequest(dataToSend, isEdit ? 'PUT' : 'POST');
+
       console.log("Parsed response:", data);
       
       if (data.success) {
@@ -3496,11 +3644,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             >
               <FiRefreshCw className={loading ? 'spinning' : ''} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
             </motion.button>
-            <div className="notification-dropdown">
+            <div className="notification-dropdown" ref={notificationRef} style={{ position: 'relative' }}>
               <motion.button 
                 className="nav-btn notification-btn"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
+                onClick={() => setShowNotifications(prev => !prev)}
                 style={{
                   background: 'rgba(16, 185, 129, 0.1)',
                   border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -3515,21 +3664,82 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                 }}
               >
                 <FiBell />
-                <span className="notification-badge" style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '-5px',
-                  background: '#ef4444',
-                  color: 'white',
-                  borderRadius: '50%',
-                  width: '18px',
-                  height: '18px',
-                  fontSize: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>3</span>
+                {unreadCount > 0 && (
+                  <span className="notification-badge" style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-5px',
+                    background: '#ef4444',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '18px',
+                    height: '18px',
+                    fontSize: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </motion.button>
+
+              {showNotifications && (
+                <div style={{
+                  position: 'absolute',
+                  top: '48px',
+                  right: 0,
+                  width: '320px',
+                  maxHeight: '360px',
+                  overflowY: 'auto',
+                  background: '#ffffff',
+                  border: '1px solid #dbe4ee',
+                  borderRadius: '12px',
+                  boxShadow: '0 18px 40px rgba(2, 12, 27, 0.2)',
+                  zIndex: 1200
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 12px',
+                    borderBottom: '1px solid #edf2f7'
+                  }}>
+                    <strong style={{ fontSize: '13px', color: '#0f172a' }}>Notifications</strong>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={markAllNotificationsRead} style={{ border: 'none', background: 'transparent', color: '#0b84f3', cursor: 'pointer', fontSize: '12px' }}>
+                        Mark all
+                      </button>
+                      <button onClick={clearAllNotifications} style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: '12px' }}>
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '16px', fontSize: '12px', color: '#64748b' }}>No notifications</div>
+                  ) : (
+                    notifications.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => markNotificationRead(item.id)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          border: 'none',
+                          borderBottom: '1px solid #f1f5f9',
+                          background: item.read ? '#ffffff' : '#f8fbff',
+                          padding: '10px 12px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <div style={{ fontSize: '12px', color: '#0f172a', marginBottom: '4px' }}>{item.message}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>{item.time}</div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
             <div className="user-menu" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 15px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '12px' }}>
               <div className="user-avatar-placeholder" style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px', color: '#fff' }}>
@@ -3597,7 +3807,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           <div className="header-section" style={{ marginBottom: '30px' }}>
             <div className="header-content" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: '#fff' }}>Welcome, {user.name || 'User'}! ⚡</h1>
+                <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px', color: '#000' }}>Welcome, {user.name || 'User'}! ⚡</h1>
                 <p style={{ color: '#94a3b8', marginBottom: '8px' }}>Inverter & Battery Service, Buy and Service Shop</p>
                 <p className="user-info-text" style={{ display: 'flex', gap: '15px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '13px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>📧 {user.email || 'No email found'}</span>
@@ -4041,6 +4251,106 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           </footer>
         </div>
       </div>
+
+      {/* Core form modals */}
+      {showServiceForm && (
+        <ServiceFormModal
+          showForm={showServiceForm}
+          editMode={!!selectedService}
+          formType="service"
+          serviceForm={serviceForm}
+          customers={customers}
+          batteries={batteries}
+          staffUsers={[]}
+          loading={{
+            services: loading,
+            replacement_battery: loading
+          }}
+          scanningSerial={scanningSerial}
+          scanningReplacementSerial={scanningReplacementSerial}
+          onClose={() => {
+            setShowServiceForm(false);
+            setSelectedService(null);
+            setBatterySearch('');
+            setSpareBatterySearch('');
+            setSelectedSpareBattery(null);
+          }}
+          onServiceInputChange={handleServiceInputChange}
+          onServiceSubmit={handleServiceSubmit}
+          onBarcodeScanned={handleBarcodeScanned}
+          onReplacementBarcodeScanned={handleReplacementBarcodeScanned}
+          onStartBatterySerialScan={handleStartBatterySerialScan}
+          onStartReplacementBatterySerialScan={handleStartReplacementBatterySerialScan}
+          onToggleReplacementBatteryForm={handleToggleReplacementBatteryForm}
+          onCopyOriginalBatteryDetails={handleCopyOriginalBatteryDetails}
+          onSpareBatterySelect={handleSpareBatterySelect}
+          onResetBatterySelection={handleResetBatterySelection}
+          editingServiceId={selectedService?.id || null}
+          onFetchServiceData={handleFetchServiceData}
+          onFetchReplacementBattery={handleFetchReplacementBattery}
+        />
+      )}
+
+      {showCustomerForm && (
+        <CustomerFormModal
+          customer={selectedCustomer}
+          onClose={() => {
+            setShowCustomerForm(false);
+            setSelectedCustomer(null);
+          }}
+          onSave={handleCustomerSave}
+          loading={loading}
+        />
+      )}
+
+      {showProductForm && (
+        <ProductFormModal
+          battery={selectedBattery}
+          onClose={() => {
+            setShowProductForm(false);
+            setSelectedBattery(null);
+          }}
+          onSave={handleBatterySave}
+          loading={loading}
+        />
+      )}
+
+      {viewMode && selectedService && (
+        <ServiceDetailModal
+          service={selectedService}
+          onClose={() => {
+            setViewMode(false);
+            setSelectedService(null);
+          }}
+          onEdit={() => {
+            setViewMode(false);
+            handleEditService(selectedService);
+          }}
+          getStatusColor={getStatusColor}
+          getPriorityColor={getPriorityColor}
+          getPaymentStatusColor={getPaymentStatusColor}
+        />
+      )}
+
+      {showDeleteConfirm && deleteItem && (
+        <DeleteConfirmationModal
+          itemType={deleteItem.type}
+          itemId={deleteItem.id}
+          itemName={
+            deleteItem.type === 'service'
+              ? services.find(service => service.id === deleteItem.id)?.service_code
+              : undefined
+          }
+          onClose={() => {
+            if (!loading) {
+              setShowDeleteConfirm(false);
+              setDeleteItem(null);
+            }
+          }}
+          onConfirm={handleConfirmDelete}
+          loading={loading}
+        />
+      )}
 
       <style>{`
         @keyframes spin {

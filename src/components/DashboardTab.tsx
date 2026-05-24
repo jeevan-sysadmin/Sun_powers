@@ -420,7 +420,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <div className="day-name">{currentDateTime.day}</div>
             <div className="full-date">
               <span className="date-number">
-                {new Date().getDate().toString().padStart(2, '0')}
+                {currentDateTime.hour ? currentDateTime.date.split(' ')[0] : "--"}
               </span>
               <span className="date-month-year">
                 <span className="month">{currentDateTime.month}</span>
@@ -463,6 +463,11 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                 </motion.span>
               </div>
               <div className="time-ampm">{currentDateTime.ampm}</div>
+            </div>
+            <div className="time-meta">
+              <span className="time-zone">Asia/Kolkata</span>
+              <span className="time-live-dot" />
+              <span className="time-live-text">Live</span>
             </div>
           </div>
           

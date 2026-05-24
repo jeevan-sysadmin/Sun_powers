@@ -139,6 +139,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
     { value: 'today', label: 'Today' },
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
+    { value: 'last_month', label: 'Last Month' },
     { value: 'year', label: 'This Year' },
     { value: 'custom', label: 'Custom Range' }
   ];
@@ -222,6 +223,14 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
           return customerDate.getMonth() === selectedMonth - 1 && 
                  customerDate.getFullYear() === selectedYear;
         });
+      case 'last_month': {
+        const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return data.filter(customer => {
+          const customerDate = new Date(customer.created_at);
+          return customerDate.getMonth() === lastMonthDate.getMonth() &&
+                 customerDate.getFullYear() === lastMonthDate.getFullYear();
+        });
+      }
 
       case 'year':
         return data.filter(customer => {
@@ -358,6 +367,10 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
       }
       case 'month':
         return `${monthOptions.find(m => m.value === selectedMonth)?.label} ${selectedYear}`;
+      case 'last_month': {
+        const lastMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+        return `Last Month (${lastMonthDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})`;
+      }
       case 'year':
         return `Year ${selectedYear}`;
       case 'custom':
@@ -2162,7 +2175,7 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                     cursor: 'pointer'
                   }}
                 >
-                  <FiPlus /> Add New Client
+                  <FiPlus /> New Client
                 </motion.button>
               )}
             </div>

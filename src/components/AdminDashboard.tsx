@@ -111,6 +111,8 @@ interface Order {
   brand?: string;
   model?: string;
   serial_number?: string;
+  original_battery_ids?: string;
+  original_battery_serials?: string;
   purchase_date?: string;
   service_type?: string;
   accessories?: string;
@@ -201,6 +203,31 @@ interface Notification {
 interface AdminDashboardProps {
   onLogout: () => void;
 }
+
+const getOrderEquipmentItems = (order: Order) => {
+  const ids = `${order.original_battery_ids || ''}`
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean);
+  const names = `${order.product_name || ''}`
+    .split(',')
+    .map(name => name.trim())
+    .filter(Boolean);
+  const serials = `${order.original_battery_serials || order.serial_number || ''}`
+    .split(',')
+    .map(serial => serial.trim())
+    .filter(Boolean);
+
+  const count = Math.max(ids.length, names.length, serials.length, 1);
+  return Array.from({ length: count }).map((_, index) => {
+    const idValue = ids[index] || ids[0] || '';
+    const nameValue = names[index] || names[0] || 'Unknown';
+    return {
+      name: idValue && names.length <= 1 ? `${nameValue} (ID: ${idValue})` : nameValue,
+      serial: serials[index] || serials[0] || 'N/A'
+    };
+  });
+};
 
 // Alert Component
 const AlertMessage: React.FC<{
@@ -427,7 +454,14 @@ const OrderDetailsModal: React.FC<{
             <div className="detail-card-content">
               <div className="detail-row">
                 <span className="detail-label">Product Name:</span>
-                <span className="detail-value">{order.product_name}</span>
+                <span className="detail-value">
+                  {getOrderEquipmentItems(order).map((item, index) => (
+                    <div key={`detail-eq-${index}`} style={{ marginBottom: '6px' }}>
+                      <div>{index + 1}. {item.name}</div>
+                      <div style={{ color: '#64748b', fontSize: '12px' }}>{item.serial}</div>
+                    </div>
+                  ))}
+                </span>
               </div>
               {(order.brand || order.model) && (
                 <div className="detail-row">
@@ -437,12 +471,14 @@ const OrderDetailsModal: React.FC<{
                   </span>
                 </div>
               )}
-              {order.serial_number && (
-                <div className="detail-row">
-                  <span className="detail-label">Serial Number:</span>
-                  <span className="detail-value">{order.serial_number}</span>
-                </div>
-              )}
+              <div className="detail-row">
+                <span className="detail-label">Serial Number(s):</span>
+                <span className="detail-value">
+                  {getOrderEquipmentItems(order).map((item, index) => (
+                    <div key={`detail-serial-${index}`}>{index + 1}. {item.serial}</div>
+                  ))}
+                </span>
+              </div>
               <div className="detail-row">
                 <span className="detail-label">Warranty:</span>
                 <span className="detail-value">
@@ -1540,6 +1576,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           brand: order.brand,
           model: order.model,
           serial_number: order.serial_number,
+          original_battery_ids: order.original_battery_ids,
+          original_battery_serials: order.original_battery_serials,
           purchase_date: order.purchase_date,
           service_type: order.service_type,
           accessories: order.accessories,
@@ -3836,12 +3874,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                 </td>
                                 <td>
                                   <div className="product-cell">
-                                    <div className="product-name">{order.product_name}</div>
-                                    {order.brand && (
-                                      <div className="product-details">
-                                        {order.brand} {order.model ? `- ${order.model}` : ''}
-                                      </div>
-                                    )}
+                                    <div className="product-name">
+                                      {getOrderEquipmentItems(order).map((item, index) => (
+                                        <div key={`table-eq-${order.id}-${index}`} style={{ marginBottom: '4px' }}>
+                                          <div>{index + 1}. {item.name}</div>
+                                          <div className="product-details">{item.serial}</div>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="truncate-cell">
@@ -4935,7 +4975,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       <Modal
         isOpen={showCreateOrder}
         onClose={() => setShowCreateOrder(false)}
-        title="Create New Service Order"
+        title="New Service Order"
         size="lg"
       >
         <div className="modal-form">
@@ -5143,7 +5183,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       <Modal
         isOpen={showCreateClient}
         onClose={() => setShowCreateClient(false)}
-        title="Add New Client"
+        title="New Client"
         size="md"
       >
         <div className="modal-form">

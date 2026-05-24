@@ -100,6 +100,99 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serialInput, setSerialInput] = useState("");
+  const [serialNumbers, setSerialNumbers] = useState<string[]>([]);
+
+  const normalizeSerial = (value: string) => value.trim();
+
+  const addSerial = (rawValue: string): boolean => {
+    const normalized = normalizeSerial(rawValue);
+    if (!normalized) return false;
+
+    let wasAdded = false;
+    setSerialNumbers(prev => {
+      const exists = prev.some(
+        serial => serial.toLowerCase() === normalized.toLowerCase()
+      );
+      if (exists) {
+        return prev;
+      }
+      wasAdded = true;
+      return [...prev, normalized];
+    });
+
+    if (!wasAdded) {
+      setErrors(prev => ({ ...prev, battery_serial: "Serial already added" }));
+      return false;
+    }
+
+    setErrors(prev => ({ ...prev, battery_serial: "" }));
+    return true;
+  };
+
+  const addSerialsFromText = (text: string) => {
+    const tokens = text
+      .split(/[\s,;]+/)
+      .map(token => normalizeSerial(token))
+      .filter(Boolean);
+
+    if (tokens.length === 0) return;
+
+    setSerialNumbers(prev => {
+      const existing = new Set(prev.map(serial => serial.toLowerCase()));
+      const next = [...prev];
+
+      for (const token of tokens) {
+        const key = token.toLowerCase();
+        if (!existing.has(key)) {
+          existing.add(key);
+          next.push(token);
+        }
+      }
+
+      return next;
+    });
+    setErrors(prev => ({ ...prev, battery_serial: "" }));
+  };
+
+  const addSerialInputValue = (value: string) => {
+    if (!value.trim()) return false;
+    if (/[\s,;]/.test(value)) {
+      addSerialsFromText(value);
+      return true;
+    }
+    return addSerial(value);
+  };
+
+  const handleSerialInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';' || e.key === 'Tab') {
+      e.preventDefault();
+      if (addSerialInputValue(serialInput)) {
+        setSerialInput("");
+      }
+    }
+  };
+
+  const handleSerialInputBlur = () => {
+    if (serialInput.trim()) {
+      if (addSerialInputValue(serialInput)) {
+        setSerialInput("");
+      }
+    }
+  };
+
+  const handleSerialPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (/[\s,;]/.test(pastedText)) {
+      e.preventDefault();
+      addSerialsFromText(pastedText);
+      setSerialInput("");
+    }
+  };
+
+  const removeSerial = (serialToRemove: string) => {
+    setSerialNumbers(prev => prev.filter(serial => serial !== serialToRemove));
+  };
 
   useEffect(() => {
     if (battery) {
@@ -139,6 +232,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         installation_date: battery.installation_date || "",
         last_service_date: battery.last_service_date || ""
       });
+      setSerialNumbers(battery.battery_serial ? [battery.battery_serial] : []);
+      setSerialInput("");
     } else {
       // Reset form for new battery
       setFormData({
@@ -161,6 +256,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         installation_date: "",
         last_service_date: ""
       });
+      setSerialNumbers([]);
+      setSerialInput("");
     }
   }, [battery]);
 
@@ -192,7 +289,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  const validateForm = (): boolean => {
+  const validateForm = (
+    serialNumbersOverride?: string[],
+    pendingSerialInputOverride?: string
+  ): boolean => {
     const newErrors: Record<string, string> = {};
     
     // Only battery_model is required now
@@ -205,6 +305,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (formData.price && parseFloat(formData.price) < 0) {
       newErrors.price = "Price cannot be negative";
     }
+
+    if (!isEdit) {
+      const effectiveSerials = serialNumbersOverride ?? serialNumbers;
+      const pendingInput = pendingSerialInputOverride ?? serialInput;
+      const hasPendingInput = !!normalizeSerial(pendingInput);
+      if (effectiveSerials.length === 0 && !hasPendingInput) {
+        newErrors.battery_serial = "Add at least one serial number";
+      }
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -212,21 +321,43 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log("🚀 Form submission started");
-    console.log("📝 Form data before submit:", formData);
-    console.log("✅ Form validation check...");
-    
-    if (!validateForm()) {
-      console.log("❌ Form validation failed:", errors);
+
+    const normalizedPendingInput = normalizeSerial(serialInput);
+    let mergedSerials = [...serialNumbers];
+    if (!isEdit && normalizedPendingInput) {
+      const pendingTokens = /[\s,;]/.test(serialInput)
+        ? serialInput
+            .split(/[\s,;]+/)
+            .map(token => normalizeSerial(token))
+            .filter(Boolean)
+        : [normalizedPendingInput];
+
+      const existing = new Set(mergedSerials.map(serial => serial.toLowerCase()));
+      for (const token of pendingTokens) {
+        const key = token.toLowerCase();
+        if (!existing.has(key)) {
+          existing.add(key);
+          mergedSerials.push(token);
+        }
+      }
+    }
+
+    if (normalizedPendingInput) {
+      setSerialInput("");
+    }
+    setSerialNumbers(mergedSerials);
+
+    if (!validateForm(mergedSerials, "")) {
       return;
     }
-    
-    // Prepare battery data
+
     const batteryData: any = {
       battery_model: formData.battery_model.trim(),
-      battery_serial: formData.battery_serial.trim() || null, // Allow empty
-      brand: formData.brand.trim() || null, // Allow empty
+      battery_serial: isEdit
+        ? (formData.battery_serial.trim() || null)
+        : (mergedSerials[0] || null),
+      serial_numbers: isEdit ? undefined : mergedSerials,
+      brand: formData.brand.trim() || null,
       capacity: formData.capacity || "",
       voltage: formData.voltage,
       battery_type: formData.battery_type,
@@ -237,34 +368,25 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       warranty_period: formData.warranty_period,
       amc_period: formData.amc_period,
       battery_condition: formData.battery_condition,
-      is_spare: formData.is_spare, // Send as boolean
+      is_spare: formData.is_spare,
       specifications: formData.specifications || "",
       purchase_date: formData.purchase_date || null,
       installation_date: formData.installation_date || null,
       last_service_date: formData.last_service_date || null
     };
-    
-    // Convert empty strings to null for dates
+
     if (batteryData.purchase_date === "") batteryData.purchase_date = null;
     if (batteryData.installation_date === "") batteryData.installation_date = null;
     if (batteryData.last_service_date === "") batteryData.last_service_date = null;
-    
+
     if (isEdit && battery) {
       batteryData.id = battery.id;
     }
-    
-    console.log("📤 Sending battery data to API:", {
-      ...batteryData,
-      is_spare_type: typeof batteryData.is_spare,
-      is_spare_value: batteryData.is_spare
-    });
-    
-    console.log("📤 JSON stringified:", JSON.stringify(batteryData));
-    
+
     try {
       await onSave(batteryData, isEdit);
     } catch (error) {
-      console.error("❌ Error saving battery:", error);
+      console.error("Error saving battery:", error);
     }
   };
 
@@ -418,14 +540,14 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               color: '#1f2937'
             }}>
               <FiBattery size={isMobile ? 20 : 24} />
-              {isEdit ? 'Edit Battery' : 'Add New Battery'}
+              {isEdit ? 'Edit Battery' : 'Add Battery'}
             </h2>
             <p style={{ 
               fontSize: isMobile ? '0.75rem' : '0.875rem', 
               color: '#6b7280', 
               margin: 0 
             }}>
-              {isEdit ? 'Update battery information' : 'Add new battery to inventory'}
+              {isEdit ? 'Update battery information' : 'Add one or many batteries with serial bubbles'}
             </p>
           </div>
           <motion.button 
@@ -484,40 +606,140 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
               {errors.battery_model && <span className="error-text">{errors.battery_model}</span>}
             </div>
-
             <div className="form-group" style={{ gridColumn: isMobile ? '1' : 'span 1' }}>
-              <label htmlFor="battery_serial" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: isMobile ? '0.8rem' : '0.875rem',
-                fontWeight: '500',
-                color: '#4b5563',
-                marginBottom: '4px'
-              }}>
-                <FiTag size={isMobile ? 14 : 16} /> Serial Number
-              </label>
-              <input
-                type="text"
-                id="battery_serial"
-                name="battery_serial"
-                value={formData.battery_serial}
-                onChange={handleChange}
-                placeholder="Enter serial number (optional)"
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '10px' : '12px',
-                  fontSize: isMobile ? '0.9rem' : '1rem',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-              />
+              {isEdit ? (
+                <>
+                  <label htmlFor="battery_serial" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: isMobile ? '0.8rem' : '0.875rem',
+                    fontWeight: '500',
+                    color: '#4b5563',
+                    marginBottom: '4px'
+                  }}>
+                    <FiTag size={isMobile ? 14 : 16} /> Serial Number
+                  </label>
+                  <input
+                    type="text"
+                    id="battery_serial"
+                    name="battery_serial"
+                    value={formData.battery_serial}
+                    onChange={handleChange}
+                    placeholder="Enter serial number"
+                    style={{
+                      width: '100%',
+                      padding: isMobile ? '10px' : '12px',
+                      fontSize: isMobile ? '0.9rem' : '1rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      transition: 'border-color 0.2s'
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  <label htmlFor="multi_battery_serial" style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: isMobile ? '0.8rem' : '0.875rem',
+                    fontWeight: '500',
+                    color: '#4b5563',
+                    marginBottom: '4px'
+                  }}>
+                    <FiTag size={isMobile ? 14 : 16} /> Serial Numbers *
+                  </label>
+
+                  <div style={{
+                    border: `1px solid ${errors.battery_serial ? '#ef4444' : '#e2e8f0'}`,
+                    borderRadius: '10px',
+                    padding: '8px',
+                    background: '#f8fafc'
+                  }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        id="multi_battery_serial"
+                        value={serialInput}
+                        onChange={(e) => {
+                          setSerialInput(e.target.value);
+                          if (errors.battery_serial) {
+                            setErrors(prev => ({ ...prev, battery_serial: '' }));
+                          }
+                        }}
+                        onKeyDown={handleSerialInputKeyDown}
+                        onBlur={handleSerialInputBlur}
+                        onPaste={handleSerialPaste}
+                        placeholder="Type serial and press Enter (or paste many)"
+                        style={{
+                          width: '100%',
+                          padding: isMobile ? '10px' : '12px',
+                          fontSize: isMobile ? '0.9rem' : '1rem',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          outline: 'none',
+                          background: '#fff'
+                        }}
+                      />
+                    </div>
+
+                    {serialNumbers.length > 0 && (
+                      <div style={{
+                        marginTop: '10px',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                      }}>
+                        {serialNumbers.map(serial => (
+                          <span
+                            key={serial}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 10px',
+                              borderRadius: '999px',
+                              background: '#e0f2fe',
+                              color: '#0f172a',
+                              fontSize: '12px',
+                              border: '1px solid #bae6fd'
+                            }}
+                          >
+                            {serial}
+                            <button
+                              type="button"
+                              onClick={() => removeSerial(serial)}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#334155',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: 0
+                              }}
+                              aria-label={`Remove ${serial}`}
+                            >
+                              <FiX size={13} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="field-description">
+                    Scanner auto-adds after a short pause. Space/comma/new line starts a new serial number. Added: {serialNumbers.length}
+                  </div>
+                </>
+              )}
+              {errors.battery_serial && <span className="error-text">{errors.battery_serial}</span>}
             </div>
 
             <div className="form-group" style={{ gridColumn: isMobile ? '1' : 'span 1' }}>
-              <label htmlFor="brand" style={{
+              <label htmlFor="brand"  style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
@@ -1107,7 +1329,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               }}
             >
               <FiSave size={isMobile ? 18 : 16} />
-              {isEdit ? 'Update Battery' : 'Add Battery'}
+              {isEdit ? 'Update Battery' : (serialNumbers.length > 1 ? `Add ${serialNumbers.length} Batteries` : 'Add Battery')}
               {loading && '...'}
             </motion.button>
           </div>
@@ -1118,3 +1340,5 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 };
 
 export default ProductFormModal;
+
+

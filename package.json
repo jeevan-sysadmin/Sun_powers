@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vite --config vite.config.mjs",
+    "build": "tsc -b && vite build --config vite.config.mjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --config vite.config.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -61,3 +61,4 @@
     "vite": "^7.2.4"
   }
 }
+

@@ -196,6 +196,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
         { value: 'today', label: 'Today' },
         { value: 'week', label: 'This Week' },
         { value: 'month', label: 'This Month' },
+        { value: 'last_month', label: 'Last Month' },
         { value: 'year', label: 'This Year' },
         { value: 'custom', label: 'Custom Range' }
     ];
@@ -277,6 +278,11 @@ const SpareTab: React.FC<SpareTabProps> = ({
             case "month":
                 return spareDate.getMonth() === today.getMonth() && 
                        spareDate.getFullYear() === today.getFullYear();
+            case "last_month": {
+                const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                return spareDate.getMonth() === lastMonthDate.getMonth() &&
+                       spareDate.getFullYear() === lastMonthDate.getFullYear();
+            }
             case "year":
                 return spareDate.getFullYear() === selectedYear;
             case "custom":
@@ -316,6 +322,11 @@ const SpareTab: React.FC<SpareTabProps> = ({
             case "month":
                 return usageDate.getMonth() === today.getMonth() && 
                        usageDate.getFullYear() === today.getFullYear();
+            case "last_month": {
+                const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                return usageDate.getMonth() === lastMonthDate.getMonth() &&
+                       usageDate.getFullYear() === lastMonthDate.getFullYear();
+            }
             case "year":
                 return usageDate.getFullYear() === selectedYear;
             case "custom":
@@ -693,6 +704,10 @@ const SpareTab: React.FC<SpareTabProps> = ({
             }
             case 'month':
                 return `${monthOptions.find(m => m.value === selectedMonth)?.label} ${selectedYear}`;
+            case 'last_month': {
+                const lastMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+                return `Last Month (${lastMonthDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})`;
+            }
             case 'year':
                 return `Year ${selectedYear}`;
             case 'custom':

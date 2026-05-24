@@ -144,6 +144,7 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
     { value: 'today', label: 'Today' },
     { value: 'week', label: 'This Week' },
     { value: 'month', label: 'This Month' },
+    { value: 'last_month', label: 'Last Month' },
     { value: 'year', label: 'This Year' },
     { value: 'custom', label: 'Custom Range' }
   ];
@@ -229,6 +230,11 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
       case "month":
         return batteryDate.getMonth() === today.getMonth() && 
                batteryDate.getFullYear() === today.getFullYear();
+      case "last_month": {
+        const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return batteryDate.getMonth() === lastMonthDate.getMonth() &&
+               batteryDate.getFullYear() === lastMonthDate.getFullYear();
+      }
       case "year":
         return batteryDate.getFullYear() === selectedYear;
       case "custom":
@@ -385,6 +391,10 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
       }
       case 'month':
         return `${monthOptions.find(m => m.value === selectedMonth)?.label} ${selectedYear}`;
+      case 'last_month': {
+        const lastMonthDate = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+        return `Last Month (${lastMonthDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })})`;
+      }
       case 'year':
         return `Year ${selectedYear}`;
       case 'custom':

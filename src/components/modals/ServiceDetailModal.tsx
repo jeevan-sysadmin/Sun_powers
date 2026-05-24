@@ -25,6 +25,9 @@ interface ServiceOrder {
   customer_phone: string;
   battery_model: string;
   battery_serial: string;
+  original_battery_ids?: string;
+  original_battery_serials?: string;
+  original_battery_models?: string;
   inverter_model: string;
   inverter_serial: string;
   issue_description: string;
@@ -231,8 +234,41 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
   const hasReplacementBattery = !!(service.replacement_battery_serial || 
     (replacementBatteryDetails && replacementBatteryDetails.battery_serial));
 
-  // Check if there's an original battery
-  const hasOriginalBattery = service.battery_id || service.battery_model;
+  const getOriginalBatteryItems = () => {
+    const cleanToken = (value: string) =>
+      value
+        .replace(/original_battery_ids/gi, '')
+        .replace(/original_battery_serials/gi, '')
+        .replace(/[{}[\]"]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const parseList = (raw: string) =>
+      `${raw || ''}`
+        .split(',')
+        .map(token => token.includes(':') ? token.split(':').slice(1).join(':') : token)
+        .map(token => cleanToken(token))
+        .filter(Boolean);
+
+    const ids = parseList(service.original_battery_ids || '');
+    const models = parseList(service.original_battery_models || service.battery_model || '');
+    const serials = parseList(service.original_battery_serials || service.battery_serial || '');
+
+    const count = Math.max(ids.length, models.length, serials.length, 1);
+    return Array.from({ length: count }).map((_, index) => {
+      const idValue = ids[index] || ids[0] || '';
+      const modelValue = models[index] || models[0] || 'N/A';
+      return {
+        model: idValue && models.length <= 1 ? `${modelValue} (ID: ${idValue})` : modelValue,
+        serial: serials[index] || serials[0] || 'N/A'
+      };
+    });
+  };
+
+  const originalBatteryItems = getOriginalBatteryItems();
+
+  // Check if there's original battery data
+  const hasOriginalBattery = originalBatteryItems.length > 0;
 
   const printReceipt = () => {
     const printWindow = window.open('', '_blank');
@@ -414,12 +450,8 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               
               ${hasOriginalBattery ? `
               <div class="battery-section">
-                <h4 style="color: #2563eb;">🔋 Selected Original Battery</h4>
-                <p><strong>Model:</strong> ${service.battery_model || 'N/A'}</p>
-                ${service.battery_serial ? `<p><strong>Serial:</strong> ${service.battery_serial}</p>` : ''}
-                ${service.battery_brand ? `<p><strong>Brand:</strong> ${service.battery_brand}</p>` : ''}
-                ${service.battery_capacity ? `<p><strong>Capacity:</strong> ${service.battery_capacity}</p>` : ''}
-                ${service.battery_type ? `<p><strong>Type:</strong> ${service.battery_type.replace(/_/g, ' ').toUpperCase()}</p>` : ''}
+                <h4 style="color: #2563eb;">🔋 Selected Original Batteries (${originalBatteryItems.length})</h4>
+                ${originalBatteryItems.map((item, index) => `<p><strong>${index + 1}. ${item.model}</strong><br/>${item.serial}</p>`).join('')}
                 ${service.battery_purchase_date ? `<p><strong>Purchase Date:</strong> ${formatDate(service.battery_purchase_date)}</p>` : ''}
                 ${service.battery_warranty_period ? `<p><strong>Warranty:</strong> ${service.battery_warranty_period}</p>` : ''}
               </div>
@@ -734,7 +766,7 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
               </div>
             )}
 
-            {/* Selected Original Battery */}
+            {/* Selected Original Batteries */}
             {hasOriginalBattery && (
               <div className="detail-section" style={{
                 background: '#eff6ff',
@@ -752,31 +784,31 @@ const ServiceDetailModal: React.FC<ServiceDetailModalProps> = ({
                   alignItems: 'center',
                   gap: '8px'
                 }}>
-                  <FiBattery color="#2563eb" size={isMobile ? 16 : 18} /> Selected Original Battery
+                  <FiBattery color="#2563eb" size={isMobile ? 16 : 18} /> Selected Original Batteries ({originalBatteryItems.length})
                 </h3>
-                <div className="detail-item" style={{ marginBottom: '8px' }}>
-                  <span className="detail-label" style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Model:</span>
-                  <span className="detail-value" style={{ marginLeft: '8px', fontWeight: 500, color: '#0f172a', fontSize: isMobile ? '13px' : '14px' }}>{service.battery_model || 'N/A'}</span>
-                </div>
-                {service.battery_serial && (
-                  <div className="detail-item" style={{ marginBottom: '8px' }}>
-                    <span className="detail-label" style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Serial:</span>
-                    <span className="detail-value" style={{ marginLeft: '8px', fontWeight: 500, color: '#0f172a', fontSize: isMobile ? '13px' : '14px' }}>{service.battery_serial}</span>
+                {originalBatteryItems.map((item, index) => (
+                  <div key={`original-battery-${index}`} style={{ marginBottom: '10px', padding: '8px 10px', border: '1px solid #bfdbfe', borderRadius: '8px', background: '#ffffff' }}>
+                    <div style={{ fontWeight: 600, color: '#0f172a', fontSize: isMobile ? '13px' : '14px' }}>
+                      {index + 1}. {item.model}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>
+                      {item.serial}
+                    </div>
                   </div>
-                )}
-                {service.battery_brand && (
+                ))}
+                {originalBatteryItems.length <= 1 && service.battery_brand && (
                   <div className="detail-item" style={{ marginBottom: '8px' }}>
                     <span className="detail-label" style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Brand:</span>
                     <span className="detail-value" style={{ marginLeft: '8px', fontWeight: 500, color: '#0f172a', fontSize: isMobile ? '13px' : '14px' }}>{service.battery_brand}</span>
                   </div>
                 )}
-                {service.battery_capacity && (
+                {originalBatteryItems.length <= 1 && service.battery_capacity && (
                   <div className="detail-item" style={{ marginBottom: '8px' }}>
                     <span className="detail-label" style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Capacity:</span>
                     <span className="detail-value" style={{ marginLeft: '8px', fontWeight: 500, color: '#0f172a', fontSize: isMobile ? '13px' : '14px' }}>{service.battery_capacity}</span>
                   </div>
                 )}
-                {service.battery_type && (
+                {originalBatteryItems.length <= 1 && service.battery_type && (
                   <div className="detail-item">
                     <span className="detail-label" style={{ color: '#64748b', fontSize: isMobile ? '12px' : '13px' }}>Type:</span>
                     <span className="detail-value" style={{ marginLeft: '8px', fontWeight: 500, color: '#0f172a', fontSize: isMobile ? '13px' : '14px' }}>{service.battery_type.replace(/_/g, ' ').toUpperCase()}</span>
