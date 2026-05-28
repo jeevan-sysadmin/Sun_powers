@@ -60,6 +60,7 @@ interface Battery {
   is_spare: number | boolean;
   spare_status?: string;
   status?: string;
+  claim_type?: string;
 }
 
 interface SpareBattery {
@@ -83,6 +84,7 @@ interface SpareBattery {
   warranty_status: string;
   is_spare: number;
   is_low_quantity: number;
+  spare_status?: string;
 }
 
 interface User {
@@ -102,6 +104,7 @@ interface ServiceForm {
   battery_id: number | null;
   original_battery_ids?: string;
   original_battery_serials?: string;
+  original_battery_models?: string;
   issue_description: string;
   status: string;
   warranty_status: string;
@@ -125,7 +128,9 @@ interface ServiceForm {
   replacement_battery_warranty: string;
   replacement_installation_date: string;
   replacement_battery_notes: string;
-  battery_claim: string;
+  battery_claim: string | null;
+  battery_claims_json?: string;
+  battery_statuses_json?: string;
   spare_battery_id: number | null;
   use_spare_battery: boolean;
   battery_source: 'original' | 'spare' | 'both' | 'none';
@@ -225,6 +230,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   const [selectedSpareBattery, setSelectedSpareBattery] = useState<SpareBattery | null>(null);
   const [selectedOriginalBattery, setSelectedOriginalBattery] = useState<Battery | null>(null);
   const [selectedOriginalBatteries, setSelectedOriginalBatteries] = useState<Battery[]>([]);
+  const [selectedBatteryClaims, setSelectedBatteryClaims] = useState<Record<number, string>>({});
+  const [selectedBatteryStatuses, setSelectedBatteryStatuses] = useState<Record<number, string>>({});
   
   const customerDropdownRef = useRef<HTMLDivElement>(null);
   const batteryDropdownRef = useRef<HTMLDivElement>(null);
@@ -235,6 +242,128 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   const [barcodeInput, setBarcodeInput] = useState<string>('');
 
   const API_BASE_URL = "http://localhost/sun_powers/api";
+
+  const mapBatteryClaimTypeToServiceClaim = (claimType?: string): string => {
+    // Service UI default should be Non Claim (NULL/empty) unless user explicitly selects a claim
+    return '';
+  };
+
+  const syncBatteryClaimFromPrimary = (primary: Battery | null, claimMap?: Record<number, string>) => {
+    const selectedMap = claimMap || selectedBatteryClaims;
+    const primaryClaim = primary ? (selectedMap[primary.id] || mapBatteryClaimTypeToServiceClaim(primary.claim_type)) : '';
+    const claimEvent = {
+      target: {
+        name: 'battery_claim',
+        value: primaryClaim
+      }
+    } as React.ChangeEvent<HTMLSelectElement>;
+    onServiceInputChange(claimEvent);
+  };
+
+  const getServiceClaimLabel = (claimType?: string): string => {
+    const normalized = (claimType || '').toLowerCase();
+    if (normalized === 'shop') return 'Shop';
+    if (normalized === 'company') return 'Company';
+    if (normalized === 'suntocomp') return 'Sun To Company';
+    if (normalized === 'comptosun') return 'Company To Sun';
+    return 'Non Claim';
+  };
+
+  const normalizeServiceStatus = (value?: string): string => {
+    const normalized = `${value || ''}`.trim().toLowerCase();
+    const allowed = new Set([
+      'pending',
+      'scheduled',
+      'charging',
+      'testing',
+      'repair',
+      'in_progress',
+      'ready',
+      'completed',
+      'delivered',
+      'cancelled'
+    ]);
+    if (!normalized || normalized === 'null' || normalized === 'undefined') return 'pending';
+    return allowed.has(normalized) ? normalized : 'pending';
+  };
+
+  const handleIndividualBatteryClaimChange = (batteryId: number, claimValue: string) => {
+    setSelectedBatteryClaims(prev => {
+      const next = { ...prev, [batteryId]: claimValue };
+      if (selectedOriginalBattery && selectedOriginalBattery.id === batteryId) {
+        syncBatteryClaimFromPrimary(selectedOriginalBattery, next);
+      }
+      return next;
+    });
+  };
+
+  const handleIndividualBatteryStatusChange = (batteryId: number, statusValue: string) => {
+    const safeStatus = normalizeServiceStatus(statusValue);
+    setSelectedBatteryStatuses(prev => ({
+      ...prev,
+      [batteryId]: safeStatus
+    }));
+
+    const isPrimary = selectedOriginalBattery && selectedOriginalBattery.id === batteryId;
+    if (isPrimary) {
+      const statusEvent = {
+        target: {
+          name: 'status',
+          value: safeStatus
+        }
+      } as React.ChangeEvent<HTMLSelectElement>;
+      onServiceInputChange(statusEvent);
+    }
+  };
+
+  const buildBatteryClaimsPayload = (
+    batteriesList: Battery[],
+    claimsMap: Record<number, string>,
+    statusMap: Record<number, string>
+  ): string => {
+    if (!batteriesList || batteriesList.length === 0) return '';
+    const payload = batteriesList.map((battery) => ({
+      battery_id: battery.id,
+      battery_serial: battery.battery_serial || '',
+      claim_type: (claimsMap[battery.id] || '').trim() || null,
+      service_status: normalizeServiceStatus(statusMap[battery.id] || serviceForm.status || 'pending')
+    }));
+    return JSON.stringify(payload);
+  };
+
+  useEffect(() => {
+    const claimsPayload = buildBatteryClaimsPayload(
+      selectedOriginalBatteries,
+      selectedBatteryClaims,
+      selectedBatteryStatuses
+    );
+    const claimsEvent = {
+      target: {
+        name: 'battery_claims_json',
+        value: claimsPayload
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onServiceInputChange(claimsEvent);
+
+    const statusesPayload = JSON.stringify(
+      selectedOriginalBatteries.map((battery) => ({
+        battery_id: battery.id,
+        battery_serial: battery.battery_serial || '',
+        service_status: normalizeServiceStatus(selectedBatteryStatuses[battery.id] || serviceForm.status || 'pending')
+      }))
+    );
+    const statusesEvent = {
+      target: {
+        name: 'battery_statuses_json',
+        value: selectedOriginalBatteries.length > 0 ? statusesPayload : ''
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onServiceInputChange(statusesEvent);
+  }, [selectedOriginalBatteries, selectedBatteryClaims, selectedBatteryStatuses, serviceForm.status]);
+
+  // NOTE:
+  // Do not auto-sync all battery statuses from the main service status.
+  // Each selected battery should keep its own independent service_status.
 
   // Responsive detection
   useEffect(() => {
@@ -272,11 +401,14 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   );
 
   const filteredSpareBatteries = spareBatteries.filter(spare => 
-    spare.battery_model.toLowerCase().includes(spareBatterySearch.toLowerCase()) ||
-    spare.battery_code.toLowerCase().includes(spareBatterySearch.toLowerCase()) ||
-    spare.manufacturer.toLowerCase().includes(spareBatterySearch.toLowerCase()) ||
+    (spare.battery_model || '').toLowerCase().includes(spareBatterySearch.toLowerCase()) ||
+    (spare.battery_code || '').toLowerCase().includes(spareBatterySearch.toLowerCase()) ||
+    (spare.manufacturer || '').toLowerCase().includes(spareBatterySearch.toLowerCase()) ||
     (spare.notes && spare.notes.toLowerCase().includes(spareBatterySearch.toLowerCase()))
-  ).filter(spare => spare.quantity > 0); // Only show spare batteries with quantity > 0
+  ).filter(spare => {
+    const status = (spare.spare_status || 'available').toLowerCase();
+    return Number(spare.quantity) > 0 && status === 'available';
+  }); // Show only currently available spare batteries
 
   // Click outside handler
   useEffect(() => {
@@ -389,7 +521,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           created_at: battery.created_at || '',
           is_spare: battery.is_spare === "1" || battery.is_spare === 1 || false,
           spare_status: battery.spare_status || 'available',
-          status: battery.status || ''
+          status: battery.status || '',
+          claim_type: battery.claim_type || 'shop'
         }));
         setLocalBatteries(formattedBatteries);
       } else {
@@ -471,7 +604,65 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       const data = await response.json();
       
       if (data.success && data.data) {
-        setSpareBatteries(data.data);
+        const formattedSpares: SpareBattery[] = (Array.isArray(data.data) ? data.data : []).map((spare: any) => ({
+          id: parseInt(spare.id) || 0,
+          battery_code: spare.battery_code || `SPARE_${spare.id || ''}`,
+          battery_type: spare.battery_type || '',
+          battery_model: spare.battery_model || '',
+          capacity: spare.capacity || '',
+          voltage: spare.voltage || '',
+          manufacturer: spare.manufacturer || spare.brand || '',
+          purchase_date: spare.purchase_date || null,
+          warranty_months: parseInt(spare.warranty_months) || 0,
+          current_condition: spare.current_condition || 'good',
+          quantity: parseInt(spare.quantity) || 0,
+          min_quantity: parseInt(spare.min_quantity) || 0,
+          location: spare.location || '',
+          notes: spare.notes || null,
+          created_at: spare.created_at || '',
+          updated_at: spare.updated_at || '',
+          warranty_expiry_date: spare.warranty_expiry_date || null,
+          warranty_status: spare.warranty_status || '',
+          is_spare: parseInt(spare.is_spare) || 1,
+          is_low_quantity: parseInt(spare.is_low_quantity) || 0,
+          spare_status: (spare.spare_status || 'available').toLowerCase()
+        }));
+
+        // Fallback: if spare API is empty, derive spare list from product batteries.
+        if (formattedSpares.length === 0) {
+          const derivedSpares: SpareBattery[] = localBatteries
+            .filter((battery) => {
+              const isSpare = battery.is_spare === true || battery.is_spare === 1 || `${battery.is_spare}` === '1';
+              const status = (battery.spare_status || 'available').toLowerCase();
+              return isSpare && status === 'available';
+            })
+            .map((battery) => ({
+              id: battery.id,
+              battery_code: battery.battery_code || `SPARE_${battery.id}`,
+              battery_type: battery.battery_type || '',
+              battery_model: battery.battery_model || '',
+              capacity: battery.capacity || '',
+              voltage: battery.voltage || '',
+              manufacturer: battery.brand || '',
+              purchase_date: battery.purchase_date || null,
+              warranty_months: parseInt(`${battery.warranty_period || 0}`) || 0,
+              current_condition: battery.battery_condition || 'good',
+              quantity: 1,
+              min_quantity: 0,
+              location: '',
+              notes: battery.specifications || null,
+              created_at: battery.created_at || '',
+              updated_at: battery.created_at || '',
+              warranty_expiry_date: null,
+              warranty_status: battery.status || '',
+              is_spare: 1,
+              is_low_quantity: 0,
+              spare_status: (battery.spare_status || 'available').toLowerCase()
+            }));
+          setSpareBatteries(derivedSpares);
+        } else {
+          setSpareBatteries(formattedSpares);
+        }
       } else {
         throw new Error(data.message || 'Failed to load spare batteries');
       }
@@ -561,6 +752,22 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       const next = exists ? prev : [...prev, battery];
       const primary = next[0] || null;
       setSelectedOriginalBattery(primary);
+      if (!exists) {
+        setSelectedBatteryClaims(prevClaims => {
+          const nextClaims = {
+            ...prevClaims,
+            [battery.id]: ''
+          };
+          syncBatteryClaimFromPrimary(primary, nextClaims);
+          return nextClaims;
+        });
+        setSelectedBatteryStatuses(prevStatuses => ({
+          ...prevStatuses,
+          [battery.id]: serviceForm.status || 'pending'
+        }));
+      } else {
+        syncBatteryClaimFromPrimary(primary);
+      }
 
       const batteryEvent = {
         target: {
@@ -585,6 +792,14 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         }
       } as React.ChangeEvent<HTMLInputElement>;
       onServiceInputChange(serialsEvent);
+
+      const modelsEvent = {
+        target: {
+          name: 'original_battery_models',
+          value: next.map(item => item.battery_model).join(', ')
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      onServiceInputChange(modelsEvent);
 
       return next;
     });
@@ -645,6 +860,15 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       const next = prev.filter(item => item.id !== batteryId);
       const primary = next[0] || null;
       setSelectedOriginalBattery(primary);
+      setSelectedBatteryClaims(prevClaims => {
+        const { [batteryId]: _removed, ...remaining } = prevClaims;
+        syncBatteryClaimFromPrimary(primary, remaining);
+        return remaining;
+      });
+      setSelectedBatteryStatuses(prevStatuses => {
+        const { [batteryId]: _removed, ...remaining } = prevStatuses;
+        return remaining;
+      });
 
       const batteryEvent = {
         target: {
@@ -669,6 +893,14 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         }
       } as React.ChangeEvent<HTMLInputElement>;
       onServiceInputChange(serialsEvent);
+
+      const modelsEvent = {
+        target: {
+          name: 'original_battery_models',
+          value: next.map(item => item.battery_model).join(', ')
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      onServiceInputChange(modelsEvent);
 
       return next;
     });
@@ -708,6 +940,8 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   const handleResetAllSelections = () => {
     setSelectedOriginalBattery(null);
     setSelectedOriginalBatteries([]);
+    setSelectedBatteryClaims({});
+    setSelectedBatteryStatuses({});
     setSelectedSpareBattery(null);
     
     const batteryEvent = {
@@ -731,6 +965,14 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       }
     } as React.ChangeEvent<HTMLInputElement>;
     onServiceInputChange(serialsEvent);
+    const modelsEvent = {
+      target: {
+        name: 'original_battery_models',
+        value: ''
+      }
+    } as React.ChangeEvent<HTMLInputElement>;
+    onServiceInputChange(modelsEvent);
+    syncBatteryClaimFromPrimary(null);
     setBatterySearch('');
 
     const spareIdEvent = {
@@ -811,6 +1053,56 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                   if (foundBatteries.length > 0) {
                     setSelectedOriginalBatteries(foundBatteries);
                     setSelectedOriginalBattery(foundBatteries[0]);
+                    const claimMap: Record<number, string> = {};
+                    const statusMap: Record<number, string> = {};
+                    const existingClaim = (serviceData.battery_claim || '').toLowerCase();
+                    const rawClaims = `${serviceData.battery_claims_json || ''}`.trim();
+                    const rawStatuses = `${serviceData.battery_statuses_json || ''}`.trim();
+                    if (rawClaims) {
+                      try {
+                        const parsed = JSON.parse(rawClaims);
+                        if (Array.isArray(parsed)) {
+                          parsed.forEach((entry: any) => {
+                            const bid = parseInt(entry?.battery_id);
+                            const claim = `${entry?.claim_type || ''}`.toLowerCase();
+                            const status = normalizeServiceStatus(entry?.service_status);
+                            if (!Number.isNaN(bid)) {
+                              claimMap[bid] = claim;
+                              statusMap[bid] = status;
+                            }
+                          });
+                        }
+                      } catch (_err) {
+                        // Fallback to existing single claim below
+                      }
+                    }
+                    if (rawStatuses) {
+                      try {
+                        const parsedStatuses = JSON.parse(rawStatuses);
+                        if (Array.isArray(parsedStatuses)) {
+                          parsedStatuses.forEach((entry: any) => {
+                            const bid = parseInt(entry?.battery_id);
+                            const status = normalizeServiceStatus(entry?.service_status);
+                            if (!Number.isNaN(bid)) {
+                              statusMap[bid] = status;
+                            }
+                          });
+                        }
+                      } catch (_err) {
+                        // Fallback to service status below
+                      }
+                    }
+                    foundBatteries.forEach((item) => {
+                      if (!(item.id in claimMap)) {
+                        claimMap[item.id] = existingClaim;
+                      }
+                      if (!(item.id in statusMap)) {
+                        statusMap[item.id] = normalizeServiceStatus(serviceData.status || serviceForm.status || 'pending');
+                      }
+                    });
+                    setSelectedBatteryClaims(claimMap);
+                    setSelectedBatteryStatuses(statusMap);
+                    syncBatteryClaimFromPrimary(foundBatteries[0], claimMap);
 
                     const batteryEvent = {
                       target: {
@@ -835,6 +1127,14 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                       }
                     } as React.ChangeEvent<HTMLInputElement>;
                     onServiceInputChange(serialsEvent);
+
+                    const modelsEvent = {
+                      target: {
+                        name: 'original_battery_models',
+                        value: foundBatteries.map(item => item.battery_model).join(', ')
+                      }
+                    } as React.ChangeEvent<HTMLInputElement>;
+                    onServiceInputChange(modelsEvent);
                   }
                 }
                 
@@ -905,6 +1205,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       setSelectedSpareBattery(null);
       setSelectedOriginalBattery(null);
       setSelectedOriginalBatteries([]);
+      setSelectedBatteryStatuses({});
       setError(null);
       setSuccessMessage(null);
     }
@@ -982,7 +1283,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   };
 
   const renderServiceForm = () => (
-    <form onSubmit={onServiceSubmit} className="service-form" style={{ padding: isMobile ? '16px' : '24px' }}>
+    <form onSubmit={onServiceSubmit} className="service-form" style={{ padding: isMobile ? '16px' : '24px', background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 22%)' }}>
       {/* Success Message */}
       {successMessage && (
         <div style={{
@@ -1055,11 +1356,39 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         </div>
       )}
 
+      <div style={{
+        marginBottom: '18px',
+        padding: isMobile ? '12px' : '14px 16px',
+        borderRadius: '12px',
+        border: '1px solid #bfdbfe',
+        background: 'linear-gradient(120deg, #eff6ff 0%, #ecfeff 100%)',
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        justifyContent: 'space-between',
+        gap: '10px'
+      }}>
+        <div style={{ color: '#0f172a', fontWeight: 700, fontSize: isMobile ? '13px' : '14px' }}>
+          Build a complete service order with client, product, claim type, and payment details
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#075985', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '999px', padding: '4px 10px' }}>Client</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#166534', background: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: '999px', padding: '4px 10px' }}>Battery</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#9a3412', background: '#ffedd5', border: '1px solid #fed7aa', borderRadius: '999px', padding: '4px 10px' }}>Service</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#4c1d95', background: '#ede9fe', border: '1px solid #ddd6fe', borderRadius: '999px', padding: '4px 10px' }}>Payment</span>
+        </div>
+      </div>
+
       {/* Customer Information */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : (isTablet ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)'),
-        gap: isMobile ? '16px' : '20px'
+        gap: isMobile ? '16px' : '20px',
+        padding: isMobile ? '14px' : '18px',
+        borderRadius: '14px',
+        border: '1px solid #dbeafe',
+        background: '#ffffff',
+        boxShadow: '0 8px 20px rgba(15, 23, 42, 0.04)'
       }}>
         <div className="form-group" style={{ position: 'relative' }} ref={customerDropdownRef}>
           <label htmlFor="customer_search" style={{ 
@@ -1189,9 +1518,10 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       <div style={{
         marginTop: isMobile ? '16px' : '20px',
         padding: isMobile ? '16px' : '20px',
-        background: '#f8fafc',
-        borderRadius: '12px',
-        border: '1px solid #e2e8f0'
+        background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+        borderRadius: '14px',
+        border: '1px solid #dbeafe',
+        boxShadow: '0 8px 20px rgba(15, 23, 42, 0.04)'
       }}>
         <h3 style={{ 
           margin: '0 0 16px 0', 
@@ -1297,44 +1627,124 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           )}
           {selectedOriginalBatteries.length > 0 && (
             <div style={{
-              marginTop: '8px',
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px'
+              marginTop: '10px',
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: '10px'
             }}>
               {selectedOriginalBatteries.map((battery) => (
                 <div
                   key={battery.id}
                   style={{
-                    padding: isMobile ? '6px 10px' : '8px 12px',
-                    background: '#dbeafe',
-                    borderRadius: '999px',
+                    padding: isMobile ? '10px' : '12px',
+                    background: '#ffffff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '10px',
                     fontSize: isMobile ? '12px' : '13px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px'
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)'
                   }}>
-                  <span>{battery.battery_model} - {battery.battery_serial}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#0f172a' }}>
+                      {battery.battery_model}
+                    </div>
+                    <div style={{ color: '#64748b', marginTop: '2px' }}>
+                      {battery.battery_serial}
+                    </div>
+                    <div style={{ marginTop: '6px' }}>
+                      <label style={{ fontSize: '11px', color: '#334155', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                        Claim Type
+                      </label>
+                      <select
+                        value={selectedBatteryClaims[battery.id] || mapBatteryClaimTypeToServiceClaim(battery.claim_type)}
+                        onChange={(e) => handleIndividualBatteryClaimChange(battery.id, e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          background: 'white',
+                          color: '#1e293b'
+                        }}
+                      >
+                        <option value="">Non Claim</option>
+                        <option value="shop">Shop</option>
+                        <option value="company">Company</option>
+                        <option value="suntocomp">Sun To Company</option>
+                        <option value="comptosun">Company To Sun</option>
+                      </select>
+                      <div style={{ marginTop: '4px', fontSize: '11px', color: '#64748b' }}>
+                        Selected: {getServiceClaimLabel(selectedBatteryClaims[battery.id] || mapBatteryClaimTypeToServiceClaim(battery.claim_type))}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '6px' }}>
+                      <label style={{ fontSize: '11px', color: '#334155', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                        Service Status
+                      </label>
+                      <select
+                        value={selectedBatteryStatuses[battery.id] || serviceForm.status || 'pending'}
+                        onChange={(e) => handleIndividualBatteryStatusChange(battery.id, e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          background: 'white',
+                          color: '#1e293b'
+                        }}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="charging">Charging</option>
+                        <option value="testing">Testing</option>
+                        <option value="repair">Repair</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="ready">Ready</option>
+                        <option value="completed">Completed</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
                   <button
                     type='button'
                     onClick={() => handleRemoveOriginalBattery(battery.id)}
                     style={{
-                      background: 'none',
-                      border: 'none',
+                      background: '#fee2e2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '6px',
                       color: '#ef4444',
                       cursor: 'pointer',
-                      fontSize: '16px',
-                      padding: 0,
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      padding: '3px 8px',
                       lineHeight: 1
                     }}
                     title='Remove original battery'
                   >
-                    x
+                    X
                   </button>
                 </div>
               ))}
             </div>
           )}
+
+          <div style={{
+            marginTop: '12px',
+            padding: isMobile ? '12px' : '14px',
+            border: '1px solid #c7d2fe',
+            borderRadius: '10px',
+            background: '#eef2ff',
+            fontSize: isMobile ? '12px' : '13px',
+            color: '#475569'
+          }}>
+            Claim Type is now individual for each selected product card.
+          </div>
         </div>
       </div>
 
@@ -1672,43 +2082,6 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         </div>
 
         <div className="form-group">
-          <label htmlFor="status" style={{ 
-            display: 'block', 
-            marginBottom: '6px', 
-            fontWeight: 500, 
-            color: '#334155',
-            fontSize: isMobile ? '13px' : '14px'
-          }}>Service Status *</label>
-          <select
-            id="status"
-            name="status"
-            value={serviceForm.status}
-            onChange={onServiceInputChange}
-            required
-            disabled={loadingData.service}
-            style={{
-              width: '100%',
-              padding: isMobile ? '8px 10px' : '10px 12px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              fontSize: isMobile ? '13px' : '14px',
-              background: 'white'
-            }}
-          >
-            <option value="pending">Pending</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="charging">Charging</option>
-            <option value="testing">Testing</option>
-            <option value="repair">Repair</option>
-            <option value="in_progress">In Progress</option>
-            <option value="ready">Ready</option>
-            <option value="completed">Completed</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-
-        <div className="form-group">
           <label htmlFor="priority" style={{ 
             display: 'block', 
             marginBottom: '6px', 
@@ -1736,41 +2109,6 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
             <option value="high">High</option>
             <option value="urgent">Urgent</option>
           </select>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="battery_claim" style={{ 
-            display: 'block', 
-            marginBottom: '6px', 
-            fontWeight: 500, 
-            color: '#334155',
-            fontSize: isMobile ? '13px' : '14px'
-          }}>
-            <FiBox style={{ marginRight: '6px', color: '#10b981' }} /> Battery Claim *
-          </label>
-          <select
-            id="battery_claim"
-            name="battery_claim"
-            value={serviceForm.battery_claim}
-            onChange={onServiceInputChange}
-            required
-            disabled={loadingData.service}
-            style={{
-              width: '100%',
-              padding: isMobile ? '8px 10px' : '10px 12px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              fontSize: isMobile ? '13px' : '14px',
-              background: 'white'
-            }}
-          >
-            <option value="shop_claim">Shop Claim</option>
-            <option value="company_claim">Company Claim</option>
-            <option value="none">No Claim</option>
-          </select>
-          <small style={{ color: '#64748b', fontSize: isMobile ? '11px' : '12px', marginTop: '4px', display: 'block' }}>
-            Select who will cover the battery replacement cost
-          </small>
         </div>
 
         <div className="form-group">
@@ -2014,10 +2352,11 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
       {!selectedSpareBattery && (
         <div className="replacement-battery-section" style={{
           marginTop: isMobile ? '24px' : '30px',
-          border: '1px solid #e2e8f0',
-          borderRadius: '12px',
+          border: '1px solid #c7d2fe',
+          borderRadius: '14px',
           padding: isMobile ? '16px' : '20px',
-          background: '#f8fafc'
+          background: 'linear-gradient(135deg, #eef2ff 0%, #ffffff 100%)',
+          boxShadow: '0 10px 24px rgba(30, 64, 175, 0.08)'
         }}>
           <div className="section-header" style={{
             display: 'flex',
@@ -2483,7 +2822,9 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'flex-end',
         gap: isMobile ? '12px' : '12px',
-        marginTop: isMobile ? '24px' : '30px'
+        marginTop: isMobile ? '24px' : '30px',
+        paddingTop: '14px',
+        borderTop: '1px dashed #cbd5e1'
       }}>
         <motion.button
           type="button"
@@ -2493,12 +2834,12 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           whileTap={{ scale: 0.95 }}
           style={{
             padding: isMobile ? '12px 20px' : '12px 24px',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            background: 'white',
-            color: '#64748b',
+            borderRadius: '10px',
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            color: '#334155',
             fontSize: isMobile ? '14px' : '14px',
-            fontWeight: 500,
+            fontWeight: 600,
             cursor: 'pointer',
             width: isMobile ? '100%' : 'auto'
           }}
@@ -2512,18 +2853,19 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           whileTap={{ scale: 0.95 }}
           style={{
             padding: isMobile ? '12px 20px' : '12px 24px',
-            borderRadius: '8px',
+            borderRadius: '10px',
             border: 'none',
-            background: '#10b981',
+            background: 'linear-gradient(120deg, #0f766e 0%, #0284c7 100%)',
             color: 'white',
             fontSize: isMobile ? '14px' : '14px',
-            fontWeight: 500,
+            fontWeight: 700,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             justifyContent: 'center',
-            width: isMobile ? '100%' : 'auto'
+            width: isMobile ? '100%' : 'auto',
+            boxShadow: '0 10px 20px rgba(2, 132, 199, 0.3)'
           }}
           disabled={loading.services || loading.replacement_battery || loadingData.service || loadingData.replacementBattery}
         >
@@ -2559,12 +2901,12 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
+        background: 'rgba(2, 6, 23, 0.62)',
         display: 'flex',
         alignItems: isMobile ? 'flex-end' : 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        backdropFilter: 'blur(4px)'
+        backdropFilter: 'blur(8px)'
       }}
     >
       <motion.div 
@@ -2574,28 +2916,28 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         exit={{ opacity: 0, scale: 0.9, y: isMobile ? 50 : 50 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'white',
-          borderRadius: isMobile ? '16px 16px 0 0' : '16px',
+          background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 22%)',
+          borderRadius: isMobile ? '18px 18px 0 0' : '18px',
           width: isMobile ? '100%' : '90%',
-          maxWidth: isMobile ? '100%' : '900px',
+          maxWidth: isMobile ? '100%' : '1080px',
           maxHeight: isMobile ? '90vh' : '90vh',
           overflow: 'hidden',
-          boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+          boxShadow: '0 28px 50px -14px rgba(2, 6, 23, 0.55)',
           position: 'relative',
           margin: isMobile ? 0 : '0 auto'
         }}
       >
         <div className="modal-header" style={{
           padding: isMobile ? '16px 20px' : '20px 24px',
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: '1px solid #bfdbfe',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'linear-gradient(to right, #f8fafc, #ffffff)'
+          background: 'linear-gradient(120deg, #0f766e 0%, #0284c7 55%, #1d4ed8 100%)'
         }}>
           <div className="modal-title">
-            <h2 style={{ margin: 0, fontSize: isMobile ? '18px' : '20px', fontWeight: 600, color: '#0f172a' }}>{getFormTitle()}</h2>
-            <p style={{ margin: '4px 0 0', fontSize: isMobile ? '12px' : '14px', color: '#64748b' }}>{getFormDescription()}</p>
+            <h2 style={{ margin: 0, fontSize: isMobile ? '18px' : '20px', fontWeight: 700, color: '#f8fafc' }}>{getFormTitle()}</h2>
+            <p style={{ margin: '4px 0 0', fontSize: isMobile ? '12px' : '14px', color: '#dbeafe' }}>{getFormDescription()}</p>
           </div>
           <motion.button 
             className="close-btn"
@@ -2607,7 +2949,7 @@ const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               border: 'none',
               fontSize: isMobile ? '20px' : '24px',
               cursor: 'pointer',
-              color: '#64748b',
+              color: '#e0f2fe',
               padding: isMobile ? '4px' : '8px',
               borderRadius: '8px',
               display: 'flex',

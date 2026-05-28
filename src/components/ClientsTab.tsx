@@ -5,7 +5,6 @@ import {
   FiEdit,
   FiTrash2,
   FiPlus,
-  FiEye,
   FiPhone,
   FiMail,
   FiMapPin,
@@ -1154,29 +1153,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
         {/* Action Buttons */}
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
           <motion.button 
-            className="action-btn view"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewCustomer(customer);
-            }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            style={{
-              padding: '8px',
-              borderRadius: '6px',
-              border: 'none',
-              background: '#e0f2fe',
-              color: '#0284c7',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <FiEye size={16} />
-          </motion.button>
-          
-          <motion.button 
             className="action-btn edit"
             onClick={(e) => {
               e.stopPropagation();
@@ -1197,29 +1173,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
             }}
           >
             <FiEdit size={16} />
-          </motion.button>
-          
-          <motion.button 
-            className="action-btn print"
-            onClick={(e) => {
-              e.stopPropagation();
-              generateCustomerPDF(customer);
-            }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            style={{
-              padding: '8px',
-              borderRadius: '6px',
-              border: 'none',
-              background: '#dbeafe',
-              color: '#2563eb',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <FiPrinter size={16} />
           </motion.button>
           
           <motion.button 
@@ -1311,16 +1264,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
         </td>
         <td>
           <div className="action-buttons" style={{ gap: '4px' }}>
-            <motion.button 
-              className="action-btn view"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewCustomer(customer);
-              }}
-              style={{ width: '28px', height: '28px' }}
-            >
-              <FiEye size={14} />
-            </motion.button>
             <motion.button 
               className="action-btn edit"
               onClick={(e) => {
@@ -2063,17 +2006,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                             <td onClick={(e) => e.stopPropagation()}>
                               <div className="action-buttons">
                                 <motion.button 
-                                  className="action-btn view"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onViewCustomer(customer);
-                                  }}
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
-                                >
-                                  <FiEye />
-                                </motion.button>
-                                <motion.button 
                                   className="action-btn edit"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2083,17 +2015,6 @@ const ClientsTab: React.FC<ClientsTabProps> = ({
                                   whileTap={{ scale: 0.9 }}
                                 >
                                   <FiEdit />
-                                </motion.button>
-                                <motion.button 
-                                  className="action-btn print"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    generateCustomerPDF(customer);
-                                  }}
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.9 }}
-                                >
-                                  <FiPrinter />
                                 </motion.button>
                                 <motion.button 
                                   className="action-btn delete"

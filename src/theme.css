@@ -145,6 +145,14 @@ table td {
   border-bottom: 1px solid #edf2f7;
 }
 
+/* Keep replacement page table text readable on light backgrounds */
+.replacement-container .orders-table th,
+.replacement-container table th,
+.replacement-container .orders-table td,
+.replacement-container table td {
+  color: #000000 !important;
+}
+
 .orders-table tbody tr:hover,
 table tbody tr:hover {
   background: #f7fbff;

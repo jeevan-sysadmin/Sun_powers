@@ -262,7 +262,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             alignItems: 'center',
             gap: '4px',
             backgroundColor: getStatusBackground(service.status),
-            color: '#000000' // Black text
+            color: '#0f172a' // Black text
           }}>
             {getStatusIcon(service.status)}
             {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
@@ -303,7 +303,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
               borderRadius: '4px',
               fontSize: '10px',
               backgroundColor: getPriorityBackground(service.priority),
-              color: '#000000' // Black text
+              color: '#0f172a' // Black text
             }}>
               {service.priority}
             </span>
@@ -331,7 +331,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
               gap: '4px',
               width: 'fit-content',
               backgroundColor: getStatusBackground(service.status),
-              color: '#000000' // Black text
+              color: '#0f172a' // Black text
             }}>
               {getStatusIcon(service.status)}
               {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
@@ -343,7 +343,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                 fontSize: '10px',
                 width: 'fit-content',
                 backgroundColor: getPriorityBackground(service.priority),
-                color: '#000000' // Black text
+                color: '#0f172a' // Black text
               }}>
                 {service.priority}
               </span>
@@ -351,7 +351,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
           </div>
         </td>
         <td style={{ padding: '12px 8px', fontSize: '12px' }}>
-          <div style={{ color: '#000000' }}>{service.issue_description?.substring(0, 30) || 'No description'}</div>
+          <div style={{ color: '#0f172a' }}>{service.issue_description?.substring(0, 30) || 'No description'}</div>
           {service.battery_serial && (
             <div style={{ fontSize: '10px', color: '#6b7280' }}>Battery: {service.battery_serial}</div>
           )}
@@ -366,7 +366,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
             {service.payment_status?.charAt(0).toUpperCase() + service.payment_status?.slice(1) || 'N/A'}
           </div>
         </td>
-        <td style={{ padding: '12px 8px', fontSize: '11px', color: '#000000' }}>
+        <td style={{ padding: '12px 8px', fontSize: '11px', color: '#0f172a' }}>
           {formatShortDate(service.created_at)}
         </td>
       </tr>
@@ -375,14 +375,15 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
 
   // Modal styles based on screen size
   const modalContentStyle = {
-    maxWidth: isMobile ? "95%" : isTablet ? "90%" : "1000px",
+    maxWidth: isMobile ? "96%" : isTablet ? "92%" : "1080px",
     maxHeight: "90vh",
     overflowY: "auto" as const,
     margin: isMobile ? "10px" : "0",
     width: "100%",
-    backgroundColor: "white",
-    borderRadius: isMobile ? "16px 16px 0 0" : "16px",
-    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+    background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 18%)",
+    borderRadius: isMobile ? "18px 18px 0 0" : "18px",
+    border: "1px solid #dbeafe",
+    boxShadow: "0 28px 48px rgba(15, 23, 42, 0.22)"
   };
 
   return (
@@ -398,7 +399,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(2, 6, 23, 0.64)",
         display: "flex",
         alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
@@ -475,25 +476,25 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: isMobile ? '16px' : '20px 24px',
-              borderBottom: '1px solid #e2e8f0',
+              borderBottom: '1px solid #bfdbfe',
               position: isMobile ? 'sticky' : 'static',
               top: 0,
-              backgroundColor: 'white',
+              background: 'linear-gradient(120deg, #0f6fff 0%, #0284c7 55%, #38bdf8 100%)',
               zIndex: 10,
-              borderRadius: isMobile ? '16px 16px 0 0' : '16px 16px 0 0'
+              borderRadius: isMobile ? '18px 18px 0 0' : '18px 18px 0 0'
             }}>
               <div>
                 <h2 style={{ 
                   fontSize: isMobile ? '1.2rem' : '1.5rem', 
                   fontWeight: '600', 
                   margin: '0 0 4px 0',
-                  color: '#1f2937'
+                  color: '#f8fafc'
                 }}>
                   Client Details
                 </h2>
                 <p style={{ 
                   fontSize: isMobile ? '0.75rem' : '0.875rem', 
-                  color: '#6b7280', 
+                  color: '#dbeafe', 
                   margin: 0 
                 }}>
                   Complete information about the client
@@ -504,12 +505,12 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                   <motion.button
                     style={{
                       padding: isMobile ? '8px 12px' : '10px 16px',
-                      background: 'white',
-                      border: '1px solid #e2e8f0',
+                      background: 'rgba(255,255,255,0.16)',
+                      border: '1px solid rgba(255,255,255,0.35)',
                       borderRadius: '8px',
                       fontSize: isMobile ? '0.8rem' : '0.875rem',
                       fontWeight: '500',
-                      color: '#4b5563',
+                      color: '#eff6ff',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -529,7 +530,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: isMobile ? '20px' : '24px',
-                    color: '#6b7280',
+                    color: '#e2e8f0',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -616,7 +617,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                   }}>
                     <FiActivity size={isMobile ? 16 : 20} color="#3b82f6" />
                     <div>
-                      <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '600', color: '#000000' }}>
+                      <div style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: '600', color: '#0f172a' }}>
                         {customer.total_services || 0}
                       </div>
                       <div style={{ fontSize: isMobile ? '0.6rem' : '0.7rem', color: '#6b7280' }}>
@@ -638,7 +639,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                     }}>
                       <FiCalendar size={isMobile ? 16 : 20} color="#3b82f6" />
                       <div>
-                        <div style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: '600', color: '#000000' }}>
+                        <div style={{ fontSize: isMobile ? '0.8rem' : '0.9rem', fontWeight: '600', color: '#0f172a' }}>
                           {formatShortDate(customer.last_service_date)}
                         </div>
                         <div style={{ fontSize: isMobile ? '0.6rem' : '0.7rem', color: '#6b7280' }}>
@@ -675,13 +676,13 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>
                       <FiPhone size={12} style={{ display: 'inline', marginRight: '4px' }} /> Phone Number
                     </div>
-                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '500', color: '#000000' }}>{customer.phone}</div>
+                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '500', color: '#0f172a' }}>{customer.phone}</div>
                   </div>
                   <div>
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>
                       <FiMail size={12} style={{ display: 'inline', marginRight: '4px' }} /> Email Address
                     </div>
-                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '500', color: '#000000' }}>
+                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '500', color: '#0f172a' }}>
                       {customer.email || <span style={{ color: '#9ca3af' }}>Not provided</span>}
                     </div>
                   </div>
@@ -711,25 +712,25 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                 }}>
                   <div style={{ gridColumn: isMobile ? '1' : 'span 2' }}>
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>Address</div>
-                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#000000' }}>
+                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#0f172a' }}>
                       {customer.address || <span style={{ color: '#9ca3af' }}>Not provided</span>}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>City</div>
-                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#000000' }}>
+                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#0f172a' }}>
                       {customer.city || <span style={{ color: '#9ca3af' }}>Not provided</span>}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>State</div>
-                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#000000' }}>
+                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#0f172a' }}>
                       {customer.state || <span style={{ color: '#9ca3af' }}>Not provided</span>}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>Zip Code</div>
-                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#000000' }}>
+                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#0f172a' }}>
                       {customer.zip_code || <span style={{ color: '#9ca3af' }}>Not provided</span>}
                     </div>
                   </div>
@@ -761,7 +762,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>
                       <FiCalendar size={12} style={{ display: 'inline', marginRight: '4px' }} /> Created Date
                     </div>
-                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#000000' }}>
+                    <div style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#0f172a' }}>
                       {formatDate(customer.created_at)}
                     </div>
                   </div>
@@ -769,7 +770,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                     <div style={{ fontSize: isMobile ? '0.7rem' : '0.8rem', color: '#6b7280', marginBottom: '4px' }}>Notes</div>
                     <div style={{ 
                       fontSize: isMobile ? '0.9rem' : '1rem',
-                      color: '#000000',
+                      color: '#0f172a',
                       background: 'white',
                       padding: '12px',
                       borderRadius: '6px',
@@ -839,7 +840,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                     textAlign: 'center'
                   }}>
                     <FiPackage size={isMobile ? 32 : 48} color="#9ca3af" style={{ marginBottom: '12px' }} />
-                    <p style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '500', marginBottom: '8px', color: '#000000' }}>
+                    <p style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: '500', marginBottom: '8px', color: '#0f172a' }}>
                       No services found for this client.
                     </p>
                     <p style={{ fontSize: isMobile ? '0.8rem' : '0.875rem', color: '#6b7280' }}>
@@ -867,12 +868,12 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                         }}>
                           <thead>
                             <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Service Code</th>
-                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Status</th>
-                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Issue Description</th>
-                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Cost (₹)</th>
-                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Payment</th>
-                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Created Date</th>
+                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#0f172a' }}>Service Code</th>
+                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#0f172a' }}>Status</th>
+                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#0f172a' }}>Issue Description</th>
+                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#0f172a' }}>Cost (₹)</th>
+                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#0f172a' }}>Payment</th>
+                              <th style={{ padding: '12px 8px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#0f172a' }}>Created Date</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -889,12 +890,12 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                         }}>
                           <thead>
                             <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#000000' }}>Service Code</th>
-                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#000000' }}>Status</th>
-                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#000000' }}>Issue Description</th>
-                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#000000' }}>Cost (₹)</th>
-                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#000000' }}>Payment</th>
-                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#000000' }}>Created Date</th>
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>Service Code</th>
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>Status</th>
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>Issue Description</th>
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>Cost (₹)</th>
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>Payment</th>
+                              <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>Created Date</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -916,7 +917,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                                       gap: '6px',
                                       width: 'fit-content',
                                       backgroundColor: getStatusBackground(service.status),
-                                      color: '#000000' // Black text
+                                      color: '#0f172a' // Black text
                                     }}>
                                       {getStatusIcon(service.status)}
                                       {service.status.charAt(0).toUpperCase() + service.status.slice(1)}
@@ -928,7 +929,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                                         fontSize: '11px',
                                         width: 'fit-content',
                                         backgroundColor: getPriorityBackground(service.priority),
-                                        color: '#000000' // Black text
+                                        color: '#0f172a' // Black text
                                       }}>
                                         {service.priority.charAt(0).toUpperCase() + service.priority.slice(1)}
                                       </span>
@@ -936,7 +937,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                                   </div>
                                 </td>
                                 <td style={{ padding: '12px 16px' }}>
-                                  <div style={{ fontSize: '13px', color: '#000000' }}>
+                                  <div style={{ fontSize: '13px', color: '#0f172a' }}>
                                     {service.issue_description || 'No description provided'}
                                   </div>
                                   {service.battery_serial && (
@@ -964,7 +965,7 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
                                 </td>
                                 <td style={{ padding: '12px 16px' }}>
                                   <div>
-                                    <div style={{ fontSize: '13px', color: '#000000' }}>
+                                    <div style={{ fontSize: '13px', color: '#0f172a' }}>
                                       {formatShortDate(service.created_at)}
                                     </div>
                                     {service.estimated_completion_date && (

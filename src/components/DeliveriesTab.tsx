@@ -55,12 +55,19 @@ interface Delivery {
   customer_phone: string;
   battery_model: string;
   battery_brand: string;
+  battery_serial?: string;
+  final_cost?: string;
+  estimated_cost?: string;
+  battery_statuses_json?: string;
+  original_battery_models?: string;
+  original_battery_serials?: string;
   scheduled_date_formatted: string;
   scheduled_time_formatted: string;
 }
 
 interface DeliveriesTabProps {
   deliveries: Delivery[];
+  filteredDeliveries?: Delivery[];
   filterStatus: string;
   filterType: string;
   searchTerm: string;
@@ -76,6 +83,7 @@ interface DeliveriesTabProps {
 
 const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
   deliveries,
+  filteredDeliveries = [],
   filterStatus,
   filterType,
   searchTerm,
@@ -104,7 +112,7 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
   
   // State for pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(-1);
   const [pageInput, setPageInput] = useState('1');
   
   // State for local search
@@ -119,7 +127,8 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
   const [expandedRows, setExpandedRows] = useState<number[]>([]);
   
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const itemsPerPageOptions = [5, 10, 15, 20, 50, 100];
+  const itemsPerPageOptions = [5, 10, 15, 20, 50, 100, -1];
+  const normalizeValue = (value: any): string => `${value ?? ''}`.trim().toLowerCase().replace(/\s+/g, '_');
 
   // Responsive detection
   useEffect(() => {
@@ -222,7 +231,8 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
 
   // Filter deliveries based on all filters
   useEffect(() => {
-    let filtered = deliveries.filter(delivery => {
+    const sourceData = filteredDeliveries.length > 0 ? filteredDeliveries : deliveries;
+    let filtered = sourceData.filter(delivery => {
       // Search filter
       if (localSearchTerm) {
         const searchLower = localSearchTerm.toLowerCase();
@@ -239,12 +249,12 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
       }
       
       // Status filter
-      if (filterStatus !== "all" && delivery.status !== filterStatus) {
+      if (filterStatus !== "all" && normalizeValue(delivery.status) !== normalizeValue(filterStatus)) {
         return false;
       }
       
       // Type filter
-      if (filterType !== "all" && delivery.delivery_type !== filterType) {
+      if (filterType !== "all" && normalizeValue(delivery.delivery_type) !== normalizeValue(filterType)) {
         return false;
       }
       
@@ -265,10 +275,11 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
   }, [deliveries, localSearchTerm, filterStatus, filterType, dateFilterType, customDateRange, selectedYear, selectedMonth]);
 
   // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const effectiveItemsPerPage = itemsPerPage === -1 ? Math.max(filteredData.length, 1) : itemsPerPage;
+  const indexOfLastItem = currentPage * effectiveItemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - effectiveItemsPerPage;
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / effectiveItemsPerPage);
 
   // Status options
   const statusOptions = [
@@ -563,6 +574,218 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
     } catch (error) {
       console.error('PDF Export Error:', error);
       alert('Error generating PDF report. Please try again.');
+    }
+  };
+
+  const generateDeliveryReceiptPDF = (delivery: Delivery) => {
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const primary = [2, 132, 199] as const;
+      const dark = [15, 23, 42] as const;
+      const muted = [100, 116, 139] as const;
+      const pageWidth = 210;
+      const margin = 14;
+      const contentWidth = pageWidth - margin * 2;
+      const receiptNo = `DLV-${delivery.id.toString().padStart(6, '0')}`;
+      const finalCostRaw = `${delivery.final_cost || delivery.estimated_cost || (delivery as any).amount || '0'}`;
+      const finalCostValue = Number.parseFloat(finalCostRaw);
+      const finalCostText = Number.isFinite(finalCostValue) ? `Rs ${finalCostValue.toFixed(2)}` : 'Rs 0.00';
+      const defaultProductName = delivery.battery_brand || 'Battery';
+      const productModel = delivery.battery_model || 'N/A';
+      const productSerial =
+        delivery.battery_serial ||
+        (delivery as any).replacement_battery_serial ||
+        (delivery as any).original_battery_serial ||
+        (delivery as any).original_battery_serials ||
+        'N/A';
+      const parseList = (value: string) =>
+        `${value || ''}`
+          .split(/[,|\n]/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+      const serialList = parseList(delivery.original_battery_serials || '');
+      const modelList = parseList(delivery.original_battery_models || '');
+      const modelBySerial: Record<string, string> = {};
+      const nameBySerial: Record<string, string> = {};
+      serialList.forEach((serial, index) => {
+        if (!serial) return;
+        modelBySerial[serial.toLowerCase()] = modelList[index] || modelList[0] || delivery.battery_model || 'Battery';
+        nameBySerial[serial.toLowerCase()] = delivery.battery_brand || 'Battery';
+      });
+
+      const productRows: Array<[string, string, string, string]> = [];
+      try {
+        const statuses = JSON.parse(`${delivery.battery_statuses_json || '[]'}`);
+        if (Array.isArray(statuses) && statuses.length > 0) {
+          statuses
+            .forEach((entry: any) => {
+              const serial = `${entry?.battery_serial || ''}`.trim() || 'N/A';
+              const model = modelBySerial[serial.toLowerCase()] || delivery.battery_model || 'Battery';
+              const productName =
+                `${entry?.product_name || entry?.battery_name || nameBySerial[serial.toLowerCase()] || defaultProductName}`.trim() || 'Battery';
+              const status = `${entry?.service_status || entry?.status || 'pending'}`.trim().replace(/_/g, ' ').toUpperCase();
+              productRows.push([productName, model, serial, status]);
+            });
+        }
+      } catch (_err) {
+        // Ignore JSON parse issues and fall back to single-row product view.
+      }
+
+      if (productRows.length === 0) {
+        productRows.push([defaultProductName, productModel, productSerial, (delivery.status || 'pending').replace(/_/g, ' ').toUpperCase()]);
+      }
+
+      doc.setFillColor(2, 132, 199);
+      doc.rect(0, 0, pageWidth, 38, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.circle(18, 19, 6, 'F');
+      doc.setFillColor(2, 132, 199);
+      doc.circle(18, 19, 2.7, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(21);
+      doc.text('SUN POWERS', 28, 15);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Battery & Inverter Service Center', 28, 21);
+      doc.text('Tirunelveli, Tamil Nadu | +91 9994445237', 28, 27);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('DELIVERY RECEIPT', pageWidth - margin, 16, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, pageWidth - margin, 22, { align: 'right' });
+
+      let y = 46;
+      doc.setDrawColor(220, 231, 241);
+      doc.setFillColor(248, 251, 255);
+      doc.roundedRect(margin, y, contentWidth, 22, 2.5, 2.5, 'FD');
+
+      doc.setTextColor(...muted);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Receipt No', margin + 4, y + 7);
+      doc.text('Delivery Code', margin + 4, y + 15);
+      doc.text('Receipt Date', margin + 75, y + 7);
+      doc.text('Scheduled Date', margin + 75, y + 15);
+      doc.text('Status', margin + 142, y + 7);
+      doc.text('Type', margin + 142, y + 15);
+
+      doc.setTextColor(...dark);
+      doc.setFont('helvetica', 'normal');
+      doc.text(receiptNo, margin + 35, y + 7);
+      doc.text(delivery.delivery_code || 'N/A', margin + 35, y + 15);
+      doc.text(new Date().toLocaleString('en-IN'), margin + 103, y + 7);
+      doc.text(delivery.scheduled_date_formatted || 'N/A', margin + 103, y + 15);
+      doc.text((delivery.status || 'pending').replace(/_/g, ' ').toUpperCase(), margin + 174, y + 7, { align: 'right' });
+      doc.text((delivery.delivery_type || 'N/A').replace(/_/g, ' ').toUpperCase(), margin + 174, y + 15, { align: 'right' });
+
+      y += 30;
+      const leftColW = 118;
+      const rightColW = contentWidth - leftColW - 4;
+
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, y, leftColW, 51, 2, 2, 'S');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primary);
+      doc.setFontSize(10);
+      doc.text('Customer Details', margin + 4, y + 7);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...muted);
+      doc.text('Name', margin + 4, y + 14);
+      doc.text('Phone', margin + 4, y + 21);
+      doc.text('Contact', margin + 4, y + 28);
+      doc.text('Contact Phone', margin + 4, y + 35);
+      doc.setTextColor(...dark);
+      doc.setFont('helvetica', 'normal');
+      doc.text(delivery.customer_name || 'N/A', margin + 28, y + 14);
+      doc.text(delivery.customer_phone || 'N/A', margin + 28, y + 21);
+      doc.text(delivery.contact_person || 'N/A', margin + 28, y + 28);
+      doc.text(delivery.contact_phone || 'N/A', margin + 28, y + 35);
+
+      doc.roundedRect(margin + leftColW + 4, y, rightColW, 51, 2, 2, 'S');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primary);
+      doc.setFontSize(10);
+      doc.text('Delivery Snapshot', margin + leftColW + 8, y + 7);
+      doc.setTextColor(...muted);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text('Service Code', margin + leftColW + 8, y + 16);
+      doc.text('Scheduled Time', margin + leftColW + 8, y + 24);
+      doc.text('Delivered Date', margin + leftColW + 8, y + 32);
+      doc.text('Delivery Person', margin + leftColW + 8, y + 40);
+      doc.text('Final Cost', margin + leftColW + 8, y + 47);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...dark);
+      doc.text(delivery.service_code || 'N/A', margin + leftColW + rightColW - 4, y + 16, { align: 'right' });
+      doc.text(delivery.scheduled_time_formatted || 'N/A', margin + leftColW + rightColW - 4, y + 24, { align: 'right' });
+      doc.text(delivery.delivered_date ? new Date(delivery.delivered_date).toLocaleDateString('en-IN') : 'N/A', margin + leftColW + rightColW - 4, y + 32, { align: 'right' });
+      doc.text(delivery.delivery_person || 'Not assigned', margin + leftColW + rightColW - 4, y + 40, { align: 'right' });
+      doc.text(finalCostText, margin + leftColW + rightColW - 4, y + 47, { align: 'right' });
+
+      y += 59;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...muted);
+      doc.text('Delivered and Remaining Products', margin, y - 3);
+      autoTable(doc, {
+        startY: y,
+        theme: 'grid',
+        head: [['Product Name', 'Model', 'Serial Number', 'Service Status']],
+        body: productRows,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [15, 23, 42], lineColor: [226, 232, 240], lineWidth: 0.1 },
+        headStyles: { fillColor: [2, 132, 199], textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: { 0: { cellWidth: 52 }, 1: { cellWidth: 50 }, 2: { cellWidth: 48 }, 3: { cellWidth: 42 } }
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 8;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primary);
+      doc.setFontSize(10);
+      doc.text('Delivery Address', margin, y);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, y + 3, contentWidth, 16, 2, 2, 'S');
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...dark);
+      doc.setFontSize(8.5);
+      const addressLines = doc.splitTextToSize(delivery.address || 'No address provided.', contentWidth - 8);
+      doc.text(addressLines, margin + 4, y + 9);
+
+      y += 24;
+      if (delivery.notes) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...primary);
+        doc.text('Delivery Notes', margin, y);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(margin, y + 3, contentWidth, 15, 2, 2, 'S');
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...dark);
+        doc.setFontSize(8.2);
+        const notesLines = doc.splitTextToSize(delivery.notes, contentWidth - 8);
+        doc.text(notesLines, margin + 4, y + 8);
+      }
+
+      doc.setDrawColor(2, 132, 199);
+      doc.line(margin, 280, pageWidth - margin, 280);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.text('This is a computer generated receipt. No signature required.', pageWidth / 2, 285, { align: 'center' });
+      doc.text('Thank you for choosing Sun Powers.', pageWidth / 2, 289, { align: 'center' });
+
+      doc.save(`delivery_receipt_${delivery.delivery_code || delivery.id}.pdf`);
+    } catch (error) {
+      console.error('Delivery Receipt PDF Error:', error);
+      alert('Error generating delivery receipt. Please try again.');
     }
   };
 
@@ -1051,29 +1274,64 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
         )}
         
         {/* Action Buttons - Edit removed, only View and Delete */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
-          <motion.button 
-            className="action-btn view"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewDelivery(delivery);
-            }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            style={{
-              padding: '8px',
-              borderRadius: '6px',
-              border: 'none',
-              background: '#e0f2fe',
-              color: '#0284c7',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <FiEye size={16} />
-          </motion.button>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+            <motion.button 
+              className="action-btn view"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDelivery(delivery);
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.9 }}
+              style={{
+                minWidth: '130px',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontWeight: 700,
+                boxShadow: '0 8px 16px rgba(37, 99, 235, 0.25)'
+              }}
+              title="View Details"
+            >
+              <FiEye size={16} />
+              <span style={{ fontSize: '12px' }}>View Details</span>
+            </motion.button>
+            <motion.button
+              className="action-btn receipt"
+              onClick={(e) => {
+                e.stopPropagation();
+                generateDeliveryReceiptPDF(delivery);
+              }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.9 }}
+              style={{
+                minWidth: '110px',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                border: '1px solid #f59e0b40',
+                background: '#fff7ed',
+                color: '#b45309',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                fontWeight: 700
+              }}
+              title="Download Receipt PDF"
+            >
+              <FiFileText size={15} />
+              <span style={{ fontSize: '12px' }}>Receipt</span>
+            </motion.button>
+          </div>
           
           <motion.button 
             className="action-btn delete"
@@ -1176,9 +1434,51 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
                 e.stopPropagation();
                 onViewDelivery(delivery);
               }}
-              style={{ width: '28px', height: '28px' }}
+              style={{
+                minWidth: '82px',
+                height: '28px',
+                padding: '0 10px',
+                borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '11px'
+              }}
+              title="View Details"
             >
-              <FiEye size={14} />
+              <FiEye size={12} />
+              <span>View</span>
+            </motion.button>
+            <motion.button
+              className="action-btn receipt"
+              onClick={(e) => {
+                e.stopPropagation();
+                generateDeliveryReceiptPDF(delivery);
+              }}
+              style={{
+                minWidth: '82px',
+                height: '28px',
+                padding: '0 10px',
+                borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                background: '#fff7ed',
+                color: '#b45309',
+                border: '1px solid #f59e0b40',
+                fontWeight: 700,
+                fontSize: '11px'
+              }}
+              title="Delivery Receipt"
+            >
+              <FiFileText size={12} />
+              <span>Receipt</span>
             </motion.button>
             <motion.button 
               className="action-btn delete"
@@ -1863,18 +2163,18 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
                 }}>
                   <thead>
                     <tr>
-                      <th className="checkbox-column" style={{ width: '40px', padding: isTablet ? '12px' : '16px' }}>
+                      <th className="checkbox-column" style={{ width: '40px', padding: isTablet ? '12px' : '16px', color: '#000' }}>
                         <button className="checkbox-btn" onClick={handleSelectAll}>
                           {selectAll ? <FiCheckSquare /> : <FiSquare />}
                         </button>
                       </th>
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Delivery Code</th>
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Service Code</th>
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Customer</th>
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Type</th>
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Schedule</th>
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Status</th>
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Actions</th>
+                      <th style={{ padding: isTablet ? '12px' : '16px', color: '#000' }}>Delivery Code</th>
+                      <th style={{ padding: isTablet ? '12px' : '16px', color: '#000' }}>Service Code</th>
+                      <th style={{ padding: isTablet ? '12px' : '16px', color: '#000' }}>Customer</th>
+                      <th style={{ padding: isTablet ? '12px' : '16px', color: '#000' }}>Type</th>
+                      <th style={{ padding: isTablet ? '12px' : '16px', color: '#000' }}>Schedule</th>
+                      <th style={{ padding: isTablet ? '12px' : '16px', color: '#000' }}>Status</th>
+                      <th style={{ padding: isTablet ? '12px' : '16px', color: '#000' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2075,23 +2375,55 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
                                 <motion.button 
                                   className="action-btn view"
                                   onClick={() => onViewDelivery(delivery)}
-                                  whileHover={{ scale: 1.1 }}
+                                  whileHover={{ scale: 1.02 }}
                                   whileTap={{ scale: 0.9 }}
                                   title="View Details"
                                   style={{
-                                    width: '32px',
+                                    width: 'auto',
                                     height: '32px',
-                                    borderRadius: '6px',
+                                    borderRadius: '999px',
+                                    padding: '0 12px',
                                     border: 'none',
-                                    background: '#e0f2fe',
-                                    color: '#0284c7',
+                                    background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+                                    color: '#fff',
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center'
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    boxShadow: '0 6px 14px rgba(37, 99, 235, 0.24)'
                                   }}
                                 >
                                   <FiEye size={14} />
+                                  <span>View</span>
+                                </motion.button>
+                                <motion.button
+                                  className="action-btn receipt"
+                                  onClick={() => generateDeliveryReceiptPDF(delivery)}
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  title="Delivery Receipt"
+                                  style={{
+                                    width: 'auto',
+                                    height: '32px',
+                                    borderRadius: '999px',
+                                    padding: '0 12px',
+                                    border: '1px solid #f59e0b40',
+                                    background: '#fff7ed',
+                                    color: '#b45309',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    fontSize: '12px',
+                                    fontWeight: 700
+                                  }}
+                                >
+                                  <FiFileText size={14} />
+                                  <span>Receipt</span>
                                 </motion.button>
                                 <motion.button 
                                   className="action-btn delete"
@@ -2209,7 +2541,7 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
                   border: '1px solid #e2e8f0'
                 }}>
                   {itemsPerPageOptions.map(option => (
-                    <option key={option} value={option}>{option}</option>
+                    <option key={option} value={option}>{option === -1 ? 'All' : option}</option>
                   ))}
                 </select>
               </div>
@@ -2350,6 +2682,11 @@ const DeliveriesTab: React.FC<DeliveriesTabProps> = ({
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+
+        .deliveries-table thead th {
+          color: #000000 !important;
+          font-size: 15px !important;
         }
       `}</style>
     </div>

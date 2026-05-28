@@ -4405,16 +4405,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                                   className="selection-checkbox"
                                 />
                               </th>
-                              <th>S.No</th>
-                              <th>Delivery Code</th>
-                              <th>Order Code</th>
-                              <th>Client Name</th>
-                              <th>Contact Person</th>
-                              <th>Delivery Address</th>
-                              <th>Delivery Type</th>
-                              <th>Scheduled Date</th>
-                              <th>Status</th>
-                              <th>Actions</th>
+                              <th style={{ color: '#000000' }}>S.No</th>
+                              <th style={{ color: '#000000' }}>Delivery Code</th>
+                              <th style={{ color: '#000000' }}>Order Code</th>
+                              <th style={{ color: '#000000' }}>Client Name</th>
+                              <th style={{ color: '#000000' }}>Contact Person</th>
+                              <th style={{ color: '#000000' }}>Delivery Address</th>
+                              <th style={{ color: '#000000' }}>Delivery Type</th>
+                              <th style={{ color: '#000000' }}>Scheduled Date</th>
+                              <th style={{ color: '#000000' }}>Status</th>
+                              <th style={{ color: '#000000' }}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>

@@ -12,7 +12,7 @@ export default defineConfig({
     cors: true,
     proxy: {
       '/api': {
-        target: 'http://localhost/sun_computers/api',
+        target: 'http://localhost/sun_powers/api',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, '')
       }

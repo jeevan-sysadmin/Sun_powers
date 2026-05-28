@@ -2072,6 +2072,11 @@ body {
   border-radius: 4px;
   font-size: 12px;
 }
+.deliveries-table thead th {
+  color: #000000 !important;
+  font-size: 15px !important;
+}
+
 
 /* Deposit Amount */
 .deposit {

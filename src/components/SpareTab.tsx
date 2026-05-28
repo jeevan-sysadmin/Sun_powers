@@ -178,6 +178,8 @@ const SpareTab: React.FC<SpareTabProps> = ({
     const [showFormModal, setShowFormModal] = useState<boolean>(false);
     const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
     const [selectedSpare, setSelectedSpare] = useState<SpareBattery | null>(null);
+    const [showUsageDetailModal, setShowUsageDetailModal] = useState<boolean>(false);
+    const [selectedUsage, setSelectedUsage] = useState<SpareUsage | null>(null);
     const [isEditing, setIsEditing] = useState<boolean>(false);
     const [localError, setLocalError] = useState<string>('');
     
@@ -520,11 +522,12 @@ const SpareTab: React.FC<SpareTabProps> = ({
 
     // Handle row click for spare usages
     const handleUsageRowClick = (usage: SpareUsage, e: React.MouseEvent) => {
-        // Find the corresponding spare and show details
-        const spare = spares.find(s => s.id === usage.spare_battery_id);
-        if (spare) {
-            handleViewDetails(spare);
+        const target = e.target as HTMLElement;
+        if (target.closest('.action-btn') || target.closest('.table-actions')) {
+            return;
         }
+        setSelectedUsage(usage);
+        setShowUsageDetailModal(true);
     };
 
     const handleEdit = (spare: SpareBattery) => {
@@ -1474,6 +1477,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                 model: true,
                 type: true,
                 manufacturer: true,
+                createdDate: true,
                 condition: true,
                 warranty: true,
                 actions: true
@@ -1485,6 +1489,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                 model: true,
                 type: true,
                 manufacturer: true,
+                createdDate: true,
                 condition: true,
                 warranty: true,
                 actions: true
@@ -1496,6 +1501,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                 model: true,
                 type: true,
                 manufacturer: false,
+                createdDate: true,
                 condition: true,
                 warranty: true,
                 actions: true
@@ -1507,6 +1513,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                 model: true,
                 type: false,
                 manufacturer: false,
+                createdDate: false,
                 condition: true,
                 warranty: false,
                 actions: true
@@ -1621,7 +1628,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                         <div style={{ fontSize: '13px' }}>{spare.manufacturer || 'N/A'}</div>
                     </div>
                 </div>
-                
+
                 {/* Expanded Content */}
                 {isExpanded && (
                     <motion.div
@@ -1641,6 +1648,11 @@ const SpareTab: React.FC<SpareTabProps> = ({
                         <div style={{ marginBottom: '12px' }}>
                             <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Purchase Date</div>
                             <div style={{ fontSize: '13px' }}>{formatDate(spare.purchase_date)}</div>
+                        </div>
+
+                        <div style={{ marginBottom: '12px' }}>
+                            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Created Date</div>
+                            <div style={{ fontSize: '13px' }}>{formatDateTime(spare.created_at)}</div>
                         </div>
                         
                         {spare.notes && (
@@ -1816,6 +1828,34 @@ const SpareTab: React.FC<SpareTabProps> = ({
                         )}
                     </motion.div>
                 )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                    <motion.button
+                        className="action-btn view"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedUsage(usage);
+                            setShowUsageDetailModal(true);
+                        }}
+                        whileHover={{ scale: 1.08 }}
+                        whileTap={{ scale: 0.92 }}
+                        title="View Usage Details"
+                        style={{
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: '#e0f2fe',
+                            color: '#0284c7',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <FiEye size={18} />
+                    </motion.button>
+                </div>
             </motion.div>
         );
     };
@@ -2327,6 +2367,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                                             {visibleColumns.model && <th>Model</th>}
                                             {visibleColumns.type && <th>Type</th>}
                                             {visibleColumns.manufacturer && <th>Manufacturer</th>}
+                                            {visibleColumns.createdDate && <th>Created Date</th>}
                                             {visibleColumns.condition && <th>Condition</th>}
                                             {visibleColumns.warranty && <th>Warranty</th>}
                                             {visibleColumns.actions && <th>Actions</th>}
@@ -2387,6 +2428,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                                                     </td>
                                                 )}
                                                 {visibleColumns.manufacturer && <td>{spare.manufacturer}</td>}
+                                                {visibleColumns.createdDate && <td>{formatDateTime(spare.created_at)}</td>}
                                                 {visibleColumns.condition && (
                                                     <td>
                                                         <span 
@@ -2594,6 +2636,7 @@ const SpareTab: React.FC<SpareTabProps> = ({
                                             <th>Status</th>
                                             {windowWidth >= 768 && <th>Used Date</th>}
                                             {windowWidth >= 1024 && <th>Staff</th>}
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2670,6 +2713,22 @@ const SpareTab: React.FC<SpareTabProps> = ({
                                                 {windowWidth >= 1024 && (
                                                     <td>{usage.service_staff_name || 'N/A'}</td>
                                                 )}
+                                                <td onClick={(e) => e.stopPropagation()}>
+                                                    <div className="table-actions">
+                                                        <motion.button
+                                                            className="action-btn view"
+                                                            onClick={() => {
+                                                                setSelectedUsage(usage);
+                                                                setShowUsageDetailModal(true);
+                                                            }}
+                                                            whileHover={{ scale: 1.08 }}
+                                                            whileTap={{ scale: 0.92 }}
+                                                            title="View Details"
+                                                        >
+                                                            <FiEye />
+                                                        </motion.button>
+                                                    </div>
+                                                </td>
                                             </motion.tr>
                                         ))}
                                     </tbody>
@@ -2807,6 +2866,140 @@ const SpareTab: React.FC<SpareTabProps> = ({
                     onConfirm={confirmDelete}
                     loading={loading}
                 />
+            )}
+
+            {showUsageDetailModal && selectedUsage && (
+                <div className="modal-overlay" onClick={() => setShowUsageDetailModal(false)}>
+                    <motion.div
+                        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: 'min(940px, 95vw)',
+                            maxHeight: '90vh',
+                            overflowY: 'auto',
+                            borderRadius: '22px',
+                            border: '1px solid #93c5fd',
+                            background: 'linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%)',
+                            boxShadow: '0 34px 70px -22px rgba(15, 23, 42, 0.5)'
+                        }}
+                    >
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '16px 18px',
+                            borderBottom: '1px solid #bfdbfe',
+                            background: 'linear-gradient(90deg, #dbeafe 0%, #ccfbf1 45%, #e0e7ff 100%)'
+                        }}>
+                            <div>
+                                <h3 style={{ margin: 0, color: '#0f172a', fontSize: windowWidth < 768 ? '18px' : '22px', fontWeight: 800 }}>
+                                    Spare Out Usage Details
+                                </h3>
+                                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#475569' }}>
+                                    Service Code: <strong>{selectedUsage.service_code || 'N/A'}</strong>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowUsageDetailModal(false)}
+                                style={{
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    width: '34px',
+                                    height: '34px',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    color: '#334155'
+                                }}
+                            >
+                                <FiX />
+                            </button>
+                        </div>
+
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: windowWidth < 768 ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+                            gap: '10px',
+                            padding: '14px 14px 0 14px'
+                        }}>
+                            <div style={{ border: '1px solid #bae6fd', borderRadius: '12px', padding: '10px 12px', background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)' }}>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>Client</div>
+                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{selectedUsage.customer_name || 'N/A'}</div>
+                            </div>
+                            <div style={{ border: '1px solid #bbf7d0', borderRadius: '12px', padding: '10px 12px', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' }}>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>Usage Status</div>
+                                <div style={{ fontWeight: 700, color: '#065f46', fontSize: '14px' }}>{(selectedUsage.status || 'N/A').toUpperCase()}</div>
+                            </div>
+                            <div style={{ border: '1px solid #ddd6fe', borderRadius: '12px', padding: '10px 12px', background: 'linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%)' }}>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>Quantity</div>
+                                <div style={{ fontWeight: 700, color: '#4c1d95', fontSize: '14px' }}>{selectedUsage.quantity_used || 'N/A'}</div>
+                            </div>
+                        </div>
+
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: windowWidth < 768 ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                            gap: '12px',
+                            padding: '14px'
+                        }}>
+                            {[
+                                { label: 'Client Name', value: selectedUsage.customer_name || 'N/A' },
+                                { label: 'Client Phone', value: selectedUsage.customer_phone || 'N/A' },
+                                { label: 'Client Email', value: selectedUsage.customer_email || 'N/A' },
+                                { label: 'Service Staff', value: selectedUsage.service_staff_name || 'N/A' },
+                                { label: 'Battery Code', value: selectedUsage.battery_code || 'N/A' },
+                                { label: 'Battery Model', value: selectedUsage.battery_model || 'N/A' },
+                                { label: 'Battery Type', value: selectedUsage.battery_type || 'N/A' },
+                                { label: 'Manufacturer', value: selectedUsage.manufacturer || 'N/A' },
+                                { label: 'Quantity Used', value: selectedUsage.quantity_used || 'N/A' },
+                                { label: 'Status', value: (selectedUsage.status || 'N/A').toUpperCase() },
+                                { label: 'Used At', value: formatDateTime(selectedUsage.used_at) },
+                                { label: 'Returned At', value: selectedUsage.returned_at ? formatDateTime(selectedUsage.returned_at) : 'Not Returned' }
+                            ].map((item) => (
+                                <div key={item.label} style={{
+                                    border: '1px solid #dbeafe',
+                                    borderRadius: '12px',
+                                    padding: '10px 12px',
+                                    background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+                                    boxShadow: '0 6px 14px rgba(30, 64, 175, 0.08)'
+                                }}>
+                                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>{item.label}</div>
+                                    <div style={{ fontSize: '14px', color: '#0f172a', fontWeight: 600, wordBreak: 'break-word' }}>{item.value}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {selectedUsage.issue_description && (
+                            <div style={{ padding: '0 14px 14px 14px' }}>
+                                <div style={{
+                                    border: '1px solid #bfdbfe',
+                                    borderRadius: '12px',
+                                    background: '#f8fafc',
+                                    padding: '12px'
+                                }}>
+                                    <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>Issue Description</div>
+                                    <div style={{ color: '#1e293b', fontSize: '14px' }}>{selectedUsage.issue_description}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedUsage.notes && (
+                            <div style={{ padding: '0 14px 14px 14px' }}>
+                                <div style={{
+                                    border: '1px solid #bbf7d0',
+                                    borderRadius: '12px',
+                                    background: '#f0fdf4',
+                                    padding: '12px'
+                                }}>
+                                    <div style={{ fontSize: '11px', color: '#166534', marginBottom: '6px' }}>Notes</div>
+                                    <div style={{ color: '#14532d', fontSize: '14px' }}>{selectedUsage.notes}</div>
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                </div>
             )}
         </div>
     );

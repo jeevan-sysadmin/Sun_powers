@@ -75,6 +75,7 @@ import ShopClaimFormModal from "./modals/ShopClaimFormModal";
 import ShopClaimDetailModal from "./modals/ShopClaimDetailModal";
 import DeleteConfirmationModal from "./modals/DeleteConfirmationModal";
 import CompclaimTab from "./CompclaimTab";
+import BackupTab from "./BackupTab";
 
 import "./css/Dashboard.css";
 import "./css/Spare.css";
@@ -115,6 +116,8 @@ interface ServiceOrder {
   warranty_status: string;
   amc_status: string;
   battery_claim: string;
+  battery_claims_json?: string;
+  battery_statuses_json?: string;
   estimated_completion_date: string;
   notes: string;
   customer_id?: number;
@@ -192,6 +195,7 @@ interface Battery {
   tracking_status?: string;
   warranty_expiry_date?: string;
   warranty_remarks?: string;
+  customer_name?: string;
 }
 
 interface Delivery {
@@ -216,6 +220,11 @@ interface Delivery {
   customer_phone: string;
   battery_model: string;
   battery_brand: string;
+  final_cost?: string;
+  estimated_cost?: string;
+  battery_statuses_json?: string;
+  original_battery_models?: string;
+  original_battery_serials?: string;
   scheduled_date_formatted: string;
   scheduled_time_formatted: string;
 }
@@ -357,6 +366,12 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
+interface BackupHistoryItem {
+  id: number;
+  fileName: string;
+  createdAt: string;
+}
+
 // Helper function to parse is_spare field consistently
 const parseIsSpare = (value: any): boolean => {
   if (value === undefined || value === null) {
@@ -425,6 +440,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
   ]);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [isTakingBackup, setIsTakingBackup] = useState<boolean>(false);
+  const [backupHistory, setBackupHistory] = useState<BackupHistoryItem[]>([]);
   
   // Data states
   const [selectedService, setSelectedService] = useState<ServiceOrder | null>(null);
@@ -470,6 +487,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [activities] = useState<Activity[]>([
     { activity: "Dashboard loaded successfully", timestamp: new Date().toLocaleTimeString() }
   ]);
+  const BACKUP_HISTORY_KEY = "sun_powers_backup_history";
   
   // Filter states
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -498,9 +516,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     battery_id: null as number | null,
     original_battery_ids: "",
     original_battery_serials: "",
+    original_battery_models: "",
     service_type: "battery_service",
     issue_description: "",
-    battery_claim: "none",
+    battery_claim: "",
+    battery_claims_json: "",
+    battery_statuses_json: "",
     status: "pending",
     warranty_status: "in_warranty",
     amc_status: "no_amc",
@@ -543,8 +564,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [scanningSerial, setScanningSerial] = useState(false);
   const [scanningReplacementSerial, setScanningReplacementSerial] = useState(false);
   
-  // API Base URL
-  const API_BASE_URL = "http://localhost/sun_powers/api";
+  // API Base URL: prefer env override, fallback to Vite proxy path
+  const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
+
+  const isSuccessResponse = (data: any): boolean => {
+    if (Array.isArray(data)) return true;
+    return data?.success === true || data?.status === 'success' || data?.ok === true;
+  };
+
+  const pickArray = <T = any,>(data: any, keys: string[]): T[] => {
+    if (Array.isArray(data)) return data as T[];
+    for (const key of keys) {
+      if (Array.isArray(data?.[key])) return data[key] as T[];
+    }
+    return [];
+  };
+
+  const normalizeValue = (value: any): string =>
+    `${value ?? ''}`.trim().toLowerCase().replace(/\s+/g, '_');
   
   // Refs
   const dashboardContentRef = useRef<HTMLDivElement>(null);
@@ -563,6 +600,99 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       },
       ...prev
     ].slice(0, 20));
+  };
+
+  useEffect(() => {
+    try {
+      const storedHistory = localStorage.getItem(BACKUP_HISTORY_KEY);
+      if (storedHistory) {
+        const parsedHistory = JSON.parse(storedHistory);
+        if (Array.isArray(parsedHistory)) {
+          setBackupHistory(parsedHistory);
+        }
+      }
+    } catch (historyError) {
+      console.error('Failed to read backup history:', historyError);
+    }
+  }, []);
+
+  const saveBackupHistory = (historyItems: BackupHistoryItem[]) => {
+    setBackupHistory(historyItems);
+    try {
+      localStorage.setItem(BACKUP_HISTORY_KEY, JSON.stringify(historyItems));
+    } catch (historySaveError) {
+      console.error('Failed to save backup history:', historySaveError);
+    }
+  };
+
+  const appendBackupHistory = (fileName: string) => {
+    const newItem: BackupHistoryItem = {
+      id: Date.now(),
+      fileName,
+      createdAt: new Date().toISOString()
+    };
+    const updatedHistory = [newItem, ...backupHistory].slice(0, 100);
+    saveBackupHistory(updatedHistory);
+  };
+
+  const triggerDownloadFromBlob = (blob: Blob, fileName: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const takeDatabaseBackup = async () => {
+    const fileName = 'sun_powers.sql';
+    setIsTakingBackup(true);
+    setError(null);
+
+    try {
+      const backupEndpoints = [
+        `${API_BASE_URL}/backup.php?download=1`,
+        `${API_BASE_URL}/backup.php`
+      ];
+
+      let downloaded = false;
+
+      for (const endpoint of backupEndpoints) {
+        try {
+          const response = await fetch(endpoint, { method: 'GET' });
+          if (!response.ok) {
+            continue;
+          }
+
+          const backupBlob = await response.blob();
+          if (!backupBlob || backupBlob.size === 0) {
+            continue;
+          }
+
+          triggerDownloadFromBlob(backupBlob, fileName);
+          appendBackupHistory(fileName);
+          setSuccessMessage('Backup downloaded successfully!');
+          addNotification('success', 'Database backup downloaded.');
+          downloaded = true;
+          break;
+        } catch (endpointError) {
+          console.warn(`Backup endpoint failed: ${endpoint}`, endpointError);
+        }
+      }
+
+      if (!downloaded) {
+        throw new Error('No working backup endpoint found');
+      }
+    } catch (backupError) {
+      console.error('Backup download failed:', backupError);
+      setError('Backup API not found. Please create `backup.php` inside your server folder: `C:/xampp/htdocs/sun_powers/api/backup.php`.');
+      addNotification('error', 'Backup failed. API endpoint is missing.');
+    } finally {
+      setIsTakingBackup(false);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    }
   };
   
   // Load user data from localStorage on component mount
@@ -753,7 +883,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         
         switch(activeTab) {
           case 'dashboard':
-            await Promise.all([
+            const dashboardResults = await Promise.allSettled([
               loadDashboardData(),
               loadServices(),
               loadSpares(),
@@ -764,6 +894,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               loadCompclaimBatteries(),
               loadShopClaims()
             ]);
+            const failedLoads = dashboardResults.filter(
+              (result): result is PromiseRejectedResult => result.status === 'rejected'
+            );
+            if (failedLoads.length > 0) {
+              console.warn('Some dashboard sections failed to load:', failedLoads.map(r => r.reason));
+              addNotification('info', 'Dashboard loaded with partial data. Some sections could not be fetched.');
+            }
             calculateAdditionalStats();
             break;
           case 'services':
@@ -796,6 +933,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           case 'shop_claims':
             await loadShopClaims();
             break;
+          case 'backup':
+            break;
           default:
             break;
         }
@@ -827,34 +966,36 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success) {
-        if (data.stats) {
+      if (isSuccessResponse(data)) {
+        const stats = data?.stats || data?.data?.stats || data?.dashboard_stats || null;
+        if (stats) {
           setDashboardStats(prev => ({
             ...prev,
-            total_services: parseInt(data.stats?.total_services?.toString() || '0'),
-            pending_services: parseInt(data.stats?.active_services?.toString() || '0'),
-            total_customers: parseInt(data.stats?.total_customers?.toString() || '0'),
-            total_batteries: parseInt(data.stats?.total_batteries?.toString() || '0'),
-            completed_services: parseInt(data.stats?.status_completed?.toString() || '0'),
-            status_pending: data.stats?.status_pending || 0,
-            status_scheduled: data.stats?.status_scheduled || 0,
-            status_in_progress: data.stats?.status_in_progress || 0,
-            status_charging: data.stats?.status_charging || 0,
-            status_testing: data.stats?.status_testing || 0,
-            status_repair: data.stats?.status_repair || 0,
-            status_completed: data.stats?.status_completed || 0,
-            status_ready: data.stats?.status_ready || 0,
-            status_delivered: data.stats?.status_delivered || 0,
-            status_cancelled: data.stats?.status_cancelled || 0,
-            priority_urgent: data.stats?.priority_urgent || 0,
-            priority_high: data.stats?.priority_high || 0,
-            priority_medium: data.stats?.priority_medium || 0,
-            priority_low: data.stats?.priority_low || 0,
+            total_services: parseInt(stats?.total_services?.toString() || '0'),
+            pending_services: parseInt((stats?.active_services ?? stats?.pending_services ?? 0).toString()),
+            total_customers: parseInt(stats?.total_customers?.toString() || '0'),
+            total_batteries: parseInt(stats?.total_batteries?.toString() || '0'),
+            completed_services: parseInt(stats?.status_completed?.toString() || '0'),
+            status_pending: stats?.status_pending || 0,
+            status_scheduled: stats?.status_scheduled || 0,
+            status_in_progress: stats?.status_in_progress || 0,
+            status_charging: stats?.status_charging || 0,
+            status_testing: stats?.status_testing || 0,
+            status_repair: stats?.status_repair || 0,
+            status_completed: stats?.status_completed || 0,
+            status_ready: stats?.status_ready || 0,
+            status_delivered: stats?.status_delivered || 0,
+            status_cancelled: stats?.status_cancelled || 0,
+            priority_urgent: stats?.priority_urgent || 0,
+            priority_high: stats?.priority_high || 0,
+            priority_medium: stats?.priority_medium || 0,
+            priority_low: stats?.priority_low || 0,
           }));
         }
         
-        if (data.recent_services) {
-          const formattedRecentServices: ServiceOrder[] = data.recent_services.map((service: any) => ({
+        const recentServices = pickArray<any>(data, ['recent_services', 'services', 'data']);
+        if (recentServices.length > 0) {
+          const formattedRecentServices: ServiceOrder[] = recentServices.map((service: any) => ({
             id: parseInt(service.id),
             service_code: service.service_code || '',
             customer_name: service.customer_name || '',
@@ -877,6 +1018,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             warranty_status: service.warranty_status || 'in_warranty',
             amc_status: service.amc_status || '',
             battery_claim: service.battery_claim || '',
+            battery_claims_json: service.battery_claims_json || '',
+            battery_statuses_json: service.battery_statuses_json || '',
             estimated_completion_date: service.estimated_completion_date || '',
             notes: service.notes || '',
             customer_id: parseInt(service.customer_id || '0'),
@@ -902,7 +1045,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Dashboard data loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load dashboard data');
+        setDashboardStats(prev => ({ ...prev }));
+        setRecentServices([]);
       }
       
     } catch (error: any) {
@@ -928,8 +1072,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.services) {
-        const formattedServices: ServiceOrder[] = data.services.map((service: any) => ({
+      const servicesList = pickArray<any>(data, ['services', 'data', 'rows', 'result']);
+      if (isSuccessResponse(data) && servicesList.length > 0) {
+        const formattedServices: ServiceOrder[] = servicesList.map((service: any) => ({
           id: parseInt(service.id),
           service_code: service.service_code || '',
           customer_name: service.customer_name || '',
@@ -952,6 +1097,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           warranty_status: service.warranty_status || 'in_warranty',
           amc_status: service.amc_status || '',
           battery_claim: service.battery_claim || '',
+          battery_claims_json: service.battery_claims_json || '',
+          battery_statuses_json: service.battery_statuses_json || '',
           estimated_completion_date: service.estimated_completion_date || '',
           notes: service.notes || '',
           customer_id: parseInt(service.customer_id || '0'),
@@ -975,7 +1122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Services loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load services');
+        setServices([]);
       }
       
     } catch (error: any) {
@@ -1001,8 +1148,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.customers) {
-        const customersWithServiceCount = data.customers.map((customer: any) => {
+      const customersList = pickArray<any>(data, ['customers', 'data', 'rows', 'result']);
+      if (isSuccessResponse(data) && customersList.length > 0) {
+        const customersWithServiceCount = customersList.map((customer: any) => {
           const serviceCount = services.filter(service => 
             service.customer_name === customer.full_name || 
             service.customer_phone === customer.phone
@@ -1028,7 +1176,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Customers loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load customers');
+        setCustomers([]);
       }
       
     } catch (error: any) {
@@ -1055,8 +1203,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.batteries) {
-        const formattedBatteries: Battery[] = data.batteries.map((battery: any) => {
+      const batteriesList = pickArray<any>(data, ['batteries', 'data', 'rows', 'result']);
+      if (isSuccessResponse(data) && batteriesList.length > 0) {
+        const formattedBatteries: Battery[] = batteriesList.map((battery: any) => {
           const isSpareValue = parseIsSpare(battery.is_spare);
           
           return {
@@ -1089,7 +1238,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             company_stock_quantity: battery.company_stock_quantity || '0',
             tracking_status: battery.tracking_status || 'active',
             warranty_expiry_date: battery.warranty_expiry_date || '',
-            warranty_remarks: battery.warranty_remarks || ''
+            warranty_remarks: battery.warranty_remarks || '',
+            customer_name: battery.customer_name || ''
           };
         });
         
@@ -1097,7 +1247,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Batteries loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load batteries');
+        setBatteries([]);
       }
       
     } catch (error: any) {
@@ -1109,7 +1259,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   // Load sun_powers_to_company batteries
   const loadSunToCompBatteries = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/batteries.php`, {
+      const response = await fetch(`${API_BASE_URL}/services.php?claim_batteries=1&type=suntocomp`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1123,17 +1273,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.batteries) {
-        const filteredBatteries = data.batteries.filter((battery: any) => 
-          battery.claim_type && battery.claim_type.toLowerCase() === "suntocomp"
-        );
-        
-        const formattedBatteries: Battery[] = filteredBatteries.map((battery: any) => {
-          const isSpareValue = parseIsSpare(battery.is_spare);
+      const claimList = pickArray<any>(data, ['data', 'batteries', 'claims', 'shop_claims', 'rows', 'result']);
+      if (isSuccessResponse(data) || claimList.length > 0) {
+        const formattedBatteries: Battery[] = claimList.map((battery: any) => {
+          const isSpareValue = parseIsSpare(battery.is_spare || false);
+          const normalizedStatus = normalizeValue(battery.status || battery.claim_status || 'active');
           
           return {
-            id: parseInt(battery.id),
-            battery_code: battery.battery_code || '',
+            id: parseInt(battery.battery_id || battery.id || '0'),
+            battery_code: `SO_${battery.service_order_id || ''}`,
             battery_model: battery.battery_model || '',
             battery_serial: battery.battery_serial || '',
             brand: battery.brand || '',
@@ -1148,20 +1296,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             battery_condition: battery.battery_condition || 'good',
             is_spare: isSpareValue,
             spare_status: battery.spare_status || 'available',
-            created_at: battery.created_at || new Date().toISOString(),
-            total_services: parseInt(battery.total_services || '0'),
+            created_at: battery.claim_date || battery.created_at || new Date().toISOString(),
+            total_services: parseInt(battery.total_services || '1'),
             specifications: battery.specifications || '',
             purchase_date: battery.purchase_date || '',
             installation_date: battery.installation_date || '',
             last_service_date: battery.last_service_date || '',
             stock_quantity: battery.stock_quantity || '0',
-            claim_type: battery.claim_type || '',
-            status: battery.status || '',
+            claim_type: battery.claim_type || 'suntocomp',
+            status: normalizedStatus || 'active',
             shop_stock_quantity: battery.shop_stock_quantity || '0',
             company_stock_quantity: battery.company_stock_quantity || '0',
             tracking_status: battery.tracking_status || 'active',
             warranty_expiry_date: battery.warranty_expiry_date || '',
-            warranty_remarks: battery.warranty_remarks || ''
+            warranty_remarks: battery.warranty_remarks || '',
+            customer_name: battery.customer_name || ''
           };
         });
         
@@ -1169,7 +1318,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Sun Powers to Company batteries loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load Sun Powers to Company batteries');
+        setSunToCompBatteries([]);
       }
       
     } catch (error: any) {
@@ -1181,7 +1330,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   // Load company_to_sun_powers batteries
   const loadComptosunBatteries = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/batteries.php`, {
+      const response = await fetch(`${API_BASE_URL}/services.php?claim_batteries=1&type=comptosun`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1195,17 +1344,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.batteries) {
-        const filteredBatteries = data.batteries.filter((battery: any) => 
-          battery.claim_type && battery.claim_type.toLowerCase() === "comptosun"
-        );
-        
-        const formattedBatteries: Battery[] = filteredBatteries.map((battery: any) => {
-          const isSpareValue = parseIsSpare(battery.is_spare);
+      const claimList = pickArray<any>(data, ['data', 'batteries', 'rows', 'result']);
+      if (isSuccessResponse(data) && claimList.length > 0) {
+        const formattedBatteries: Battery[] = claimList.map((battery: any) => {
+          const isSpareValue = parseIsSpare(battery.is_spare || false);
           
           return {
-            id: parseInt(battery.id),
-            battery_code: battery.battery_code || '',
+            id: parseInt(battery.battery_id || battery.id || '0'),
+            battery_code: `SO_${battery.service_order_id || ''}`,
             battery_model: battery.battery_model || '',
             battery_serial: battery.battery_serial || '',
             brand: battery.brand || '',
@@ -1220,20 +1366,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             battery_condition: battery.battery_condition || 'good',
             is_spare: isSpareValue,
             spare_status: battery.spare_status || 'available',
-            created_at: battery.created_at || new Date().toISOString(),
-            total_services: parseInt(battery.total_services || '0'),
+            created_at: battery.claim_date || battery.created_at || new Date().toISOString(),
+            total_services: parseInt(battery.total_services || '1'),
             specifications: battery.specifications || '',
             purchase_date: battery.purchase_date || '',
             installation_date: battery.installation_date || '',
             last_service_date: battery.last_service_date || '',
             stock_quantity: battery.stock_quantity || '0',
-            claim_type: battery.claim_type || '',
+            claim_type: battery.claim_type || 'comptosun',
             status: battery.status || '',
             shop_stock_quantity: battery.shop_stock_quantity || '0',
             company_stock_quantity: battery.company_stock_quantity || '0',
             tracking_status: battery.tracking_status || 'active',
             warranty_expiry_date: battery.warranty_expiry_date || '',
-            warranty_remarks: battery.warranty_remarks || ''
+            warranty_remarks: battery.warranty_remarks || '',
+            customer_name: battery.customer_name || ''
           };
         });
         
@@ -1241,7 +1388,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Company to Sun Powers batteries loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load Company to Sun Powers batteries');
+        setComptosunBatteries([]);
       }
       
     } catch (error: any) {
@@ -1253,7 +1400,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   // Load company claims batteries
   const loadCompclaimBatteries = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/batteries.php`, {
+      const response = await fetch(`${API_BASE_URL}/services.php?claim_batteries=1&type=company`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1267,17 +1414,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.batteries) {
-        const filteredBatteries = data.batteries.filter((battery: any) => 
-          battery.claim_type && battery.claim_type.toLowerCase() === "company"
-        );
-        
-        const formattedBatteries: Battery[] = filteredBatteries.map((battery: any) => {
-          const isSpareValue = parseIsSpare(battery.is_spare);
+      const claimList = pickArray<any>(data, ['data', 'batteries', 'rows', 'result']);
+      if (isSuccessResponse(data) && claimList.length > 0) {
+        const formattedBatteries: Battery[] = claimList.map((battery: any) => {
+          const isSpareValue = parseIsSpare(battery.is_spare || false);
           
           return {
-            id: parseInt(battery.id),
-            battery_code: battery.battery_code || '',
+            id: parseInt(battery.battery_id || battery.id || '0'),
+            battery_code: `SO_${battery.service_order_id || ''}`,
             battery_model: battery.battery_model || '',
             battery_serial: battery.battery_serial || '',
             brand: battery.brand || '',
@@ -1292,20 +1436,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             battery_condition: battery.battery_condition || 'good',
             is_spare: isSpareValue,
             spare_status: battery.spare_status || 'available',
-            created_at: battery.created_at || new Date().toISOString(),
-            total_services: parseInt(battery.total_services || '0'),
+            created_at: battery.claim_date || battery.created_at || new Date().toISOString(),
+            total_services: parseInt(battery.total_services || '1'),
             specifications: battery.specifications || '',
             purchase_date: battery.purchase_date || '',
             installation_date: battery.installation_date || '',
             last_service_date: battery.last_service_date || '',
             stock_quantity: battery.stock_quantity || '0',
-            claim_type: battery.claim_type || '',
+            claim_type: battery.claim_type || 'company',
             status: battery.status || '',
             shop_stock_quantity: battery.shop_stock_quantity || '0',
             company_stock_quantity: battery.company_stock_quantity || '0',
             tracking_status: battery.tracking_status || 'active',
             warranty_expiry_date: battery.warranty_expiry_date || '',
-            warranty_remarks: battery.warranty_remarks || ''
+            warranty_remarks: battery.warranty_remarks || '',
+            customer_name: battery.customer_name || ''
           };
         });
         
@@ -1313,7 +1458,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Company claims loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load company claims');
+        setCompclaimBatteries([]);
       }
       
     } catch (error: any) {
@@ -1339,8 +1484,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.deliveries) {
-        const formattedDeliveries: Delivery[] = data.deliveries.map((delivery: any) => ({
+      const deliveriesList = pickArray<any>(data, ['deliveries', 'data', 'rows', 'result']);
+      if (isSuccessResponse(data) && deliveriesList.length > 0) {
+        const formattedDeliveries: Delivery[] = deliveriesList.map((delivery: any) => ({
           id: parseInt(delivery.id),
           delivery_code: delivery.delivery_code || '',
           service_id: parseInt(delivery.service_id || '0'),
@@ -1362,6 +1508,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           customer_phone: delivery.customer_phone || '',
           battery_model: delivery.battery_model || '',
           battery_brand: delivery.battery_brand || '',
+          final_cost: `${delivery.final_cost || delivery.service_final_cost || delivery.amount || ''}`,
+          estimated_cost: `${delivery.estimated_cost || delivery.service_estimated_cost || ''}`,
           scheduled_date_formatted: delivery.scheduled_date_formatted || '',
           scheduled_time_formatted: delivery.scheduled_time_formatted || ''
         }));
@@ -1369,7 +1517,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Deliveries loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load deliveries');
+        setDeliveries([]);
       }
       
     } catch (error: any) {
@@ -1381,22 +1529,103 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   // Load replacements from API
   const loadReplacements = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/replacement_battery.php`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+      const endpoints = [
+        `${API_BASE_URL}/replacement_battery.php`,
+        `${API_BASE_URL}/replacements.php`
+      ];
+
+      let data: any = null;
+      let lastError: any = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const rawText = await response.text();
+          let parsed: any = null;
+          try {
+            parsed = JSON.parse(rawText);
+          } catch {
+            parsed = null;
+          }
+
+          if (parsed) {
+            data = parsed;
+            break;
+          }
+        } catch (endpointError: any) {
+          lastError = endpointError;
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const data: ApiResponse = await response.json();
-      
-      if (data.success && data.data) {
-        const formattedReplacements: ReplacementBattery[] = data.data.map((replacement: any) => ({
+
+      if (!data) {
+        console.warn('Unable to load replacements from available endpoints:', lastError);
+        // Fallback: build replacement rows from services that carry replacement battery info.
+        try {
+          const serviceRes = await fetch(`${API_BASE_URL}/services.php`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          });
+          if (serviceRes.ok) {
+            const serviceData = await serviceRes.json();
+            const serviceList = pickArray<any>(serviceData, ['services', 'data', 'rows', 'result']);
+            const fallbackReplacements: ReplacementBattery[] = serviceList
+              .filter((s: any) => `${s.replacement_battery_serial || ''}`.trim() !== '')
+              .map((s: any) => ({
+                id: `${s.id || s.service_id || s.service_order_id || ''}`,
+                service_order_id: `${s.id || s.service_order_id || ''}`,
+                battery_model: s.replacement_battery_model || s.battery_model || '',
+                battery_serial: s.replacement_battery_serial || '',
+                brand: s.replacement_battery_brand || s.battery_brand || '',
+                capacity: s.replacement_battery_capacity || s.battery_capacity || '',
+                voltage: s.replacement_battery_voltage || s.voltage || '12V',
+                battery_type: s.replacement_battery_type || s.battery_type || 'lead_acid',
+                price: `${s.replacement_battery_price || s.final_cost || s.estimated_cost || '0.00'}`,
+                warranty_period: s.replacement_battery_warranty || s.warranty_period || '',
+                installation_date: s.replacement_installation_date || s.created_at || '',
+                notes: s.replacement_battery_notes || s.notes || '',
+                created_at: s.created_at || '',
+                updated_at: s.updated_at || '',
+                service_code: s.service_code || '',
+                customer_id: `${s.customer_id || ''}`,
+                service_status: normalizeValue(s.status || 'pending'),
+                customer_name: s.customer_name || '',
+                customer_phone: s.customer_phone || '',
+                original_battery_model: s.original_battery_models || s.battery_model || '',
+                original_battery_serial: s.original_battery_serials || s.battery_serial || '',
+                warranty_status: normalizeValue(s.warranty_status || 'in_warranty'),
+                warranty_expiry_date: s.warranty_expiry_date || ''
+              }));
+
+            setReplacements(fallbackReplacements);
+            return;
+          }
+        } catch (fallbackError) {
+          console.warn('Replacement fallback from services failed:', fallbackError);
+        }
+        setReplacements([]);
+        return;
+      }
+
+      const replacementList = pickArray<any>(data, ['data', 'replacements', 'replacement_batteries', 'rows', 'result']);
+      if (isSuccessResponse(data) || replacementList.length > 0) {
+        const formattedReplacements: ReplacementBattery[] = replacementList.map((replacement: any) => {
+          const rawStatus = replacement.service_status || replacement.status || replacement.replacement_status || 'pending';
+          const normalizedStatus = `${rawStatus}`.trim().toLowerCase().replace(/\s+/g, '_');
+          return ({
           id: replacement.id?.toString() || '',
           service_order_id: replacement.service_order_id || '',
           battery_model: replacement.battery_model || '',
@@ -1413,24 +1642,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           updated_at: replacement.updated_at || '',
           service_code: replacement.service_code || '',
           customer_id: replacement.customer_id || '',
-          service_status: replacement.service_status || 'pending',
+          service_status: normalizedStatus || 'pending',
           customer_name: replacement.customer_name || '',
           customer_phone: replacement.customer_phone || '',
           original_battery_model: replacement.original_battery_model || '',
           original_battery_serial: replacement.original_battery_serial || '',
           warranty_status: replacement.warranty_status || 'in_warranty',
           warranty_expiry_date: replacement.warranty_expiry_date || ''
-        }));
+        })});
         setReplacements(formattedReplacements);
         setSuccessMessage('Replacements loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load replacements');
+        setReplacements([]);
       }
       
     } catch (error: any) {
       console.error('Error loading replacements:', error);
-      throw error;
+      setReplacements([]);
     }
   };
 
@@ -1451,8 +1680,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.data) {
-        const formattedSpares: SpareBattery[] = data.data.map((spare: any) => ({
+      const spareList = pickArray<any>(data, ['data', 'spares', 'batteries', 'rows', 'result']);
+      if (isSuccessResponse(data) && spareList.length > 0) {
+        const formattedSpares: SpareBattery[] = spareList.map((spare: any) => ({
           id: spare.id?.toString() || '',
           battery_code: spare.battery_code || `SPARE_${spare.id}`,
           battery_type: spare.battery_type || '',
@@ -1478,7 +1708,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         setSuccessMessage('Spare batteries loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load spare batteries');
+        setSpares([]);
       }
       
     } catch (error: any) {
@@ -1499,15 +1729,65 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       });
       
       if (!response.ok) {
-        console.log('Shop claims API not available');
-        setShopClaims([]);
+        console.log('Shop claims API not available, using services fallback');
+        const servicesResponse = await fetch(`${API_BASE_URL}/services.php`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!servicesResponse.ok) {
+          setShopClaims([]);
+          return;
+        }
+
+        const servicesData: any = await servicesResponse.json();
+        const servicesList = pickArray<any>(servicesData, ['services', 'data', 'rows', 'result']);
+        const fallbackClaims: ShopClaim[] = servicesList
+          .filter((s: any) => {
+            const claim = normalizeValue(s.battery_claim || '');
+            const claimsJson = `${s.battery_claims_json || ''}`.toLowerCase();
+            return claim === 'shop' || claimsJson.includes('"claim_type":"shop"');
+          })
+          .map((s: any, idx: number) => ({
+            id: `${s.id || idx}`,
+            claim_code: s.claim_code || `SC_${s.service_code || s.id || idx}`,
+            battery_id: `${s.battery_id || ''}`,
+            battery_model: s.battery_model || s.original_battery_models || '',
+            battery_serial: s.battery_serial || s.original_battery_serials || '',
+            customer_id: `${s.customer_id || ''}`,
+            customer_name: s.customer_name || '',
+            customer_phone: s.customer_phone || '',
+            service_id: `${s.id || ''}`,
+            service_code: s.service_code || '',
+            issue_description: s.issue_description || '',
+            claim_type: 'shop',
+            priority: normalizeValue(s.priority || 'medium'),
+            status: normalizeValue(s.status || 'pending'),
+            claim_date: s.created_at || '',
+            expected_resolution_date: s.estimated_completion_date || '',
+            resolved_date: null,
+            resolution_notes: s.notes || '',
+            created_at: s.created_at || new Date().toISOString(),
+            updated_at: s.updated_at || new Date().toISOString(),
+            brand: s.battery_brand || '',
+            capacity: s.battery_capacity || '',
+            voltage: s.battery_voltage || '',
+            battery_type: s.battery_type || '',
+            warranty_status: normalizeValue(s.warranty_status || 'in_warranty')
+          }));
+
+        setShopClaims(fallbackClaims);
         return;
       }
       
       const data: ApiResponse = await response.json();
       
-      if (data.success && data.data) {
-        const formattedShopClaims: ShopClaim[] = data.data.map((claim: any) => ({
+      const shopClaimsList = pickArray<any>(data, ['data', 'shop_claims', 'claims', 'rows', 'result']);
+      if (isSuccessResponse(data) || shopClaimsList.length > 0) {
+        const formattedShopClaims: ShopClaim[] = shopClaimsList.map((claim: any) => ({
           id: claim.id?.toString() || '',
           claim_code: claim.claim_code || `SC_${claim.id}`,
           battery_id: claim.battery_id || '',
@@ -1519,9 +1799,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           service_id: claim.service_id || '',
           service_code: claim.service_code || '',
           issue_description: claim.issue_description || '',
-          claim_type: claim.claim_type || 'warranty',
-          priority: claim.priority || 'medium',
-          status: claim.status || 'pending',
+          claim_type: normalizeValue(claim.claim_type || 'warranty'),
+          priority: normalizeValue(claim.priority || 'medium'),
+          status: normalizeValue(claim.status || claim.claim_status || 'pending'),
           claim_date: claim.claim_date || '',
           expected_resolution_date: claim.expected_resolution_date || '',
           resolved_date: claim.resolved_date || null,
@@ -1532,13 +1812,63 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           capacity: claim.capacity || '',
           voltage: claim.voltage || '',
           battery_type: claim.battery_type || '',
-          warranty_status: claim.warranty_status || 'in_warranty'
+          warranty_status: normalizeValue(claim.warranty_status || 'in_warranty')
         }));
         setShopClaims(formattedShopClaims);
         setSuccessMessage('Shop claims loaded successfully!');
         setTimeout(() => setSuccessMessage(null), 3000);
       } else {
-        throw new Error(data.message || 'Failed to load shop claims');
+        // API responded but no rows in expected shape; fallback to services-backed shop claims.
+        const servicesResponse = await fetch(`${API_BASE_URL}/services.php`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!servicesResponse.ok) {
+          setShopClaims([]);
+          return;
+        }
+
+        const servicesData: any = await servicesResponse.json();
+        const servicesList = pickArray<any>(servicesData, ['services', 'data', 'rows', 'result']);
+        const fallbackClaims: ShopClaim[] = servicesList
+          .filter((s: any) => {
+            const claim = normalizeValue(s.battery_claim || '');
+            const claimsJson = `${s.battery_claims_json || ''}`.toLowerCase();
+            return claim === 'shop' || claimsJson.includes('"claim_type":"shop"');
+          })
+          .map((s: any, idx: number) => ({
+            id: `${s.id || idx}`,
+            claim_code: s.claim_code || `SC_${s.service_code || s.id || idx}`,
+            battery_id: `${s.battery_id || ''}`,
+            battery_model: s.battery_model || s.original_battery_models || '',
+            battery_serial: s.battery_serial || s.original_battery_serials || '',
+            customer_id: `${s.customer_id || ''}`,
+            customer_name: s.customer_name || '',
+            customer_phone: s.customer_phone || '',
+            service_id: `${s.id || ''}`,
+            service_code: s.service_code || '',
+            issue_description: s.issue_description || '',
+            claim_type: 'shop',
+            priority: normalizeValue(s.priority || 'medium'),
+            status: normalizeValue(s.status || 'pending'),
+            claim_date: s.created_at || '',
+            expected_resolution_date: s.estimated_completion_date || '',
+            resolved_date: null,
+            resolution_notes: s.notes || '',
+            created_at: s.created_at || new Date().toISOString(),
+            updated_at: s.updated_at || new Date().toISOString(),
+            brand: s.battery_brand || '',
+            capacity: s.battery_capacity || '',
+            voltage: s.battery_voltage || '',
+            battery_type: s.battery_type || '',
+            warranty_status: normalizeValue(s.warranty_status || 'in_warranty')
+          }));
+
+        setShopClaims(fallbackClaims);
       }
       
     } catch (error: any) {
@@ -1620,7 +1950,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       switch(activeTab) {
         case 'dashboard':
-          await Promise.all([
+          const dashboardResults = await Promise.allSettled([
             loadDashboardData(),
             loadServices(),
             loadSpares(),
@@ -1631,6 +1961,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             loadCompclaimBatteries(),
             loadShopClaims()
           ]);
+          const failedLoads = dashboardResults.filter(
+            (result): result is PromiseRejectedResult => result.status === 'rejected'
+          );
+          if (failedLoads.length > 0) {
+            console.warn('Some dashboard refresh requests failed:', failedLoads.map(r => r.reason));
+            addNotification('info', 'Refresh completed with partial data. Some sections could not be fetched.');
+          }
           calculateAdditionalStats();
           break;
         case 'services':
@@ -1663,6 +2000,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         case 'shop_claims':
           await loadShopClaims();
           break;
+        case 'backup':
+          break;
         default:
           break;
       }
@@ -1671,7 +2010,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error: any) {
       console.error('Error refreshing data:', error);
-      setError('Failed to refresh data');
+      setError(`Failed to refresh ${activeTab} data`);
     } finally {
       setLoading(false);
     }
@@ -1705,7 +2044,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       original_battery_models: service.original_battery_models || service.battery_model || "",
       service_type: service.service_type || "battery_service",
       issue_description: service.issue_description || "",
-      battery_claim: service.battery_claim || "none",
+      battery_claim: service.battery_claim || "",
+      battery_claims_json: service.battery_claims_json || "",
+      battery_statuses_json: service.battery_statuses_json || "",
       status: service.status || "pending",
       warranty_status: service.warranty_status || "in_warranty",
       amc_status: service.amc_status || "no_amc",
@@ -1756,9 +2097,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       battery_id: null,
       original_battery_ids: "",
       original_battery_serials: "",
+      original_battery_models: "",
       service_type: "battery_service",
       issue_description: "",
-      battery_claim: "none",
+      battery_claim: "",
+      battery_claims_json: "",
+      battery_statuses_json: "",
       status: "pending",
       warranty_status: "in_warranty",
       amc_status: "no_amc",
@@ -1812,9 +2156,64 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     try {
       setLoading(true);
       setError(null);
+
+      const normalizeServiceStatus = (value: any): string => {
+        const normalized = `${value || ''}`.trim().toLowerCase();
+        const allowed = new Set([
+          'pending',
+          'scheduled',
+          'charging',
+          'testing',
+          'repair',
+          'in_progress',
+          'ready',
+          'completed',
+          'delivered',
+          'cancelled'
+        ]);
+        if (!normalized || normalized === 'null' || normalized === 'undefined') return 'pending';
+        return allowed.has(normalized) ? normalized : 'pending';
+      };
+
+      const buildSafeBatteryStatusesJson = (): string => {
+        const idList = `${serviceForm.original_battery_ids || ''}`
+          .split(',')
+          .map((x) => parseInt(x.trim()))
+          .filter((x) => !Number.isNaN(x));
+        const serialList = `${serviceForm.original_battery_serials || ''}`
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean);
+
+        let sourceEntries: any[] = [];
+        try {
+          const parsed = JSON.parse(`${serviceForm.battery_statuses_json || '[]'}`);
+          if (Array.isArray(parsed)) sourceEntries = parsed;
+        } catch (_err) {
+          sourceEntries = [];
+        }
+
+        const byId: Record<number, string> = {};
+        sourceEntries.forEach((entry) => {
+          const bid = parseInt(entry?.battery_id);
+          if (!Number.isNaN(bid)) {
+            byId[bid] = normalizeServiceStatus(entry?.service_status);
+          }
+        });
+
+        const rows = idList.map((id, index) => ({
+          battery_id: id,
+          battery_serial: serialList[index] || '',
+          service_status: byId[id] || normalizeServiceStatus(serviceForm.status)
+        }));
+
+        if (rows.length === 0) return '';
+        return JSON.stringify(rows);
+      };
       
       const url = `${API_BASE_URL}/services.php`;
       const method = selectedService ? 'PUT' : 'POST';
+      const safeBatteryStatusesJson = buildSafeBatteryStatusesJson();
       
       const serviceData: any = {
         customer_id: serviceForm.customer_id || "",
@@ -1822,10 +2221,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         battery_id: serviceForm.battery_id || "",
         original_battery_ids: serviceForm.original_battery_ids || "",
         original_battery_serials: serviceForm.original_battery_serials || "",
+        original_battery_models: serviceForm.original_battery_models || "",
         service_type: "battery_service",
         issue_description: serviceForm.issue_description || "",
-        battery_claim: serviceForm.battery_claim || "none",
-        status: serviceForm.status || "pending",
+        battery_claim: serviceForm.battery_claim || "",
+        battery_claims_json: serviceForm.battery_claims_json || "",
+        battery_statuses_json: safeBatteryStatusesJson || serviceForm.battery_statuses_json || "",
         warranty_status: serviceForm.warranty_status || "in_warranty",
         amc_status: serviceForm.amc_status || "no_amc",
         estimated_cost: parseFloat(serviceForm.estimated_cost) || 0,
@@ -2276,12 +2677,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       const response = await fetch(url, {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify(body)
+        body: new URLSearchParams(body).toString()
       });
-      
-      const data: ApiResponse = await response.json();
+
+      const responseText = await response.text();
+      let data: ApiResponse;
+      try {
+        data = JSON.parse(responseText);
+      } catch (_jsonError) {
+        const preview = (responseText || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        throw new Error(`Server returned invalid JSON: ${preview}`);
+      }
       
       if (data.success) {
         switch(deleteItem.type) {
@@ -2342,6 +2750,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         amc_status: serviceData.amc_status || 'no_amc',
         service_staff_name: user?.name || "Admin"
       };
+      delete (dataToSend as any).status;
       
       const response = await fetch(url, {
         method: method,
@@ -2385,13 +2794,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
       const url = `${API_BASE_URL}/customers.php`;
       const method = isEdit ? 'PUT' : 'POST';
+      const payload = new URLSearchParams(customerData);
+
+      // Ensure backend receives explicit update identifiers/intent.
+      if (isEdit) {
+        const currentId = payload.get('id') || (selectedCustomer?.id ? String(selectedCustomer.id) : '');
+        if (currentId) {
+          payload.set('id', currentId);
+          payload.set('customer_id', currentId);
+        }
+        payload.set('action', 'update');
+      } else {
+        payload.set('action', 'create');
+      }
+      // Request backend to allow duplicate phone numbers.
+      payload.set('allow_duplicate_phone', '1');
+      payload.set('allow_duplicate', '1');
       
       const response = await fetch(url, {
         method: method,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams(customerData).toString()
+        body: payload.toString()
       });
       
       const responseText = await response.text();
@@ -2415,7 +2840,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       
     } catch (error: any) {
       console.error('Error saving customer:', error);
-      setError('Failed to save customer: ' + error.message);
+      const message = `${error?.message || ''}`;
+      if (message.toLowerCase().includes('phone number already exists')) {
+        setError('Failed to save customer: backend is still blocking duplicate phone numbers. Apply API/DB duplicate-phone patch.');
+      } else {
+        setError('Failed to save customer: ' + message);
+      }
     } finally {
       setLoading(false);
     }
@@ -3228,7 +3658,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   };
   
   const getFilteredBatteries = () => {
-    let filtered = [...batteries];
+    // Products Management should only list regular (non-spare) batteries.
+    // Spare-marked batteries are managed exclusively in Spare Batteries tab.
+    let filtered = batteries.filter(battery => !parseIsSpare(battery.is_spare));
     
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -3244,14 +3676,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       filtered = filtered.filter(battery => battery.battery_type === filterBatteryType);
     }
     
-    if (filterSpareStatus !== "all") {
-      if (filterSpareStatus === "spare") {
-        filtered = filtered.filter(battery => parseIsSpare(battery.is_spare));
-      } else if (filterSpareStatus === "regular") {
-        filtered = filtered.filter(battery => !parseIsSpare(battery.is_spare));
-      } else {
-        filtered = filtered.filter(battery => battery.spare_status === filterSpareStatus);
-      }
+    if (filterSpareStatus !== "all" && filterSpareStatus !== "regular") {
+      filtered = [];
     }
     
     if (filterWarrantyStatus !== "all") {
@@ -3341,8 +3767,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     
     if (filterCompclaimStatus !== "all") {
       filtered = filtered.filter(battery => 
-        battery.status === filterCompclaimStatus || 
-        (filterCompclaimStatus === 'active' && (!battery.status || battery.status === ''))
+        normalizeValue(battery.status) === normalizeValue(filterCompclaimStatus) || 
+        (normalizeValue(filterCompclaimStatus) === 'active' && (!battery.status || battery.status === ''))
       );
     }
     
@@ -3351,14 +3777,60 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
     
     if (filterWarrantyStatus !== "all") {
-      filtered = filtered.filter(battery => battery.status === filterWarrantyStatus);
+      filtered = filtered.filter(battery => normalizeValue(battery.status) === normalizeValue(filterWarrantyStatus));
     }
     
     return filtered;
   };
 
   const getFilteredDeliveries = () => {
-    let filtered = [...deliveries];
+    const serviceHasDeliveredBattery = (service: any): boolean => {
+      const raw = `${service?.battery_statuses_json || ''}`.trim();
+      if (!raw) return false;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return false;
+        return parsed.some((entry: any) => `${entry?.service_status || ''}`.trim().toLowerCase() === 'delivered');
+      } catch (_err) {
+        return false;
+      }
+    };
+
+    const deliveredByServiceId = new Map<number, boolean>();
+    services.forEach((service) => {
+      const sid = Number(service.id);
+      if (!Number.isNaN(sid)) {
+        deliveredByServiceId.set(sid, serviceHasDeliveredBattery(service));
+      }
+    });
+
+    let filtered = deliveries.map((delivery) => {
+      const linkedService = services.find((s) => Number(s.id) === Number(delivery.service_id));
+      const serviceDelivered = deliveredByServiceId.get(Number(delivery.service_id));
+      const deliveryStatus = normalizeValue(delivery.status);
+
+      // UI consistency: do not show DELIVERED if linked service data is not delivered.
+      if (deliveryStatus === 'delivered' && serviceDelivered === false) {
+        return {
+          ...delivery,
+          status: 'scheduled',
+          battery_statuses_json: linkedService?.battery_statuses_json || '',
+          original_battery_models: linkedService?.original_battery_models || linkedService?.battery_model || '',
+          original_battery_serials: linkedService?.original_battery_serials || linkedService?.battery_serial || '',
+          final_cost: delivery.final_cost || linkedService?.final_cost || linkedService?.estimated_cost || '',
+          estimated_cost: delivery.estimated_cost || linkedService?.estimated_cost || ''
+        };
+      }
+
+      return {
+        ...delivery,
+        battery_statuses_json: linkedService?.battery_statuses_json || '',
+        original_battery_models: linkedService?.original_battery_models || linkedService?.battery_model || '',
+        original_battery_serials: linkedService?.original_battery_serials || linkedService?.battery_serial || '',
+        final_cost: delivery.final_cost || linkedService?.final_cost || linkedService?.estimated_cost || '',
+        estimated_cost: delivery.estimated_cost || linkedService?.estimated_cost || ''
+      };
+    });
     
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -3371,11 +3843,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
     
     if (filterDeliveryStatus !== "all") {
-      filtered = filtered.filter(delivery => delivery.status === filterDeliveryStatus);
+      filtered = filtered.filter(delivery => normalizeValue(delivery.status) === normalizeValue(filterDeliveryStatus));
     }
     
     if (filterDeliveryType !== "all") {
-      filtered = filtered.filter(delivery => delivery.delivery_type === filterDeliveryType);
+      filtered = filtered.filter(delivery => normalizeValue(delivery.delivery_type) === normalizeValue(filterDeliveryType));
     }
     
     return filtered;
@@ -3401,18 +3873,48 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
     
     if (filterReplacementStatus !== "all") {
-      filtered = filtered.filter(replacement => replacement.service_status === filterReplacementStatus);
+      filtered = filtered.filter(replacement => normalizeValue(replacement.service_status) === normalizeValue(filterReplacementStatus));
     }
     
     if (filterWarrantyStatus !== "all") {
-      filtered = filtered.filter(replacement => replacement.warranty_status === filterWarrantyStatus);
+      filtered = filtered.filter(replacement => normalizeValue(replacement.warranty_status) === normalizeValue(filterWarrantyStatus));
     }
     
     return filtered;
   };
 
   const getFilteredSpares = () => {
-    let filtered = [...spares];
+    const mappedSparesFromBatteries: SpareBattery[] = batteries
+      .filter((battery) => parseIsSpare(battery.is_spare))
+      .map((battery) => ({
+        id: `${battery.id}`,
+        battery_code: battery.battery_code || `SPARE_${battery.id}`,
+        battery_type: battery.battery_type || '',
+        battery_model: battery.battery_model || '',
+        capacity: battery.capacity || '',
+        voltage: battery.voltage || '',
+        manufacturer: battery.brand || '',
+        purchase_date: battery.purchase_date || '',
+        warranty_months: battery.warranty_period || '',
+        current_condition: battery.battery_condition || 'good',
+        quantity: battery.stock_quantity || '0',
+        min_quantity: '0',
+        location: '',
+        notes: battery.specifications || '',
+        created_at: battery.created_at || new Date().toISOString(),
+        updated_at: battery.created_at || new Date().toISOString(),
+        is_spare: 1,
+        warranty_status: battery.status || 'active',
+        warranty_expiry_date: battery.warranty_expiry_date || '',
+        is_low_quantity: 0
+      }));
+
+    const mergedById = new Map<string, SpareBattery>();
+    [...mappedSparesFromBatteries, ...spares].forEach((spare) => {
+      if (spare?.id) mergedById.set(`${spare.id}`, spare);
+    });
+
+    let filtered = Array.from(mergedById.values());
     
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -3457,19 +3959,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
     
     if (filterShopClaimStatus !== "all") {
-      filtered = filtered.filter(claim => claim.status === filterShopClaimStatus);
+      filtered = filtered.filter(claim => normalizeValue(claim.status) === normalizeValue(filterShopClaimStatus));
     }
     
     if (filterShopClaimType !== "all") {
-      filtered = filtered.filter(claim => claim.claim_type === filterShopClaimType);
+      filtered = filtered.filter(claim => normalizeValue(claim.claim_type) === normalizeValue(filterShopClaimType));
     }
     
     if (filterShopClaimPriority !== "all") {
-      filtered = filtered.filter(claim => claim.priority === filterShopClaimPriority);
+      filtered = filtered.filter(claim => normalizeValue(claim.priority) === normalizeValue(filterShopClaimPriority));
     }
     
     if (filterWarrantyStatus !== "all") {
-      filtered = filtered.filter(claim => claim.warranty_status === filterWarrantyStatus);
+      filtered = filtered.filter(claim => normalizeValue(claim.warranty_status) === normalizeValue(filterWarrantyStatus));
     }
     
     return filtered;
@@ -4139,7 +4641,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               onFilterStatusChange={setFilterReplacementStatus}
               onFilterWarrantyStatusChange={setFilterWarrantyStatus}
               onRefresh={handleRefresh}
-              getStatusColor={getReplacementStatusColor}
               onSearchChange={handleReplacementSearchChange}
             />
           )}
@@ -4199,6 +4700,14 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               getTypeColor={getShopClaimTypeColor}
               getPriorityColor={getPriorityColor}
               getWarrantyColor={getWarrantyColor}
+            />
+          )}
+
+          {activeTab === 'backup' && (
+            <BackupTab
+              onTakeBackup={takeDatabaseBackup}
+              isTakingBackup={isTakingBackup}
+              backupHistory={backupHistory}
             />
           )}
 
@@ -4315,6 +4824,50 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         />
       )}
 
+      {showProductDetail && selectedBattery && (
+        <ProductDetailModal
+          battery={selectedBattery}
+          getBatteryTypeColor={getBatteryTypeColor}
+          getConditionColor={getConditionColor}
+          onClose={() => {
+            setShowProductDetail(false);
+            setSelectedBattery(null);
+          }}
+          onEdit={() => {
+            setShowProductDetail(false);
+            handleEditBattery(selectedBattery);
+          }}
+        />
+      )}
+
+      {showDeliveryDetail && selectedDelivery && (
+        <DeliveryDetailModal
+          delivery={selectedDelivery}
+          onClose={() => {
+            setShowDeliveryDetail(false);
+            setSelectedDelivery(null);
+          }}
+          onUpdateStatus={(status) => handleUpdateDeliveryStatus(selectedDelivery.id, status)}
+          getStatusColor={getStatusColor}
+          getTypeColor={getDeliveryTypeColor}
+        />
+      )}
+
+      {showReplacementDetail && selectedReplacement && (
+        <ReplacementDetailModal
+          replacement={selectedReplacement}
+          onClose={() => {
+            setShowReplacementDetail(false);
+            setSelectedReplacement(null);
+          }}
+          onEdit={() => {
+            setShowReplacementDetail(false);
+            handleEditReplacement(selectedReplacement);
+          }}
+          getStatusColor={getReplacementStatusColor}
+        />
+      )}
+
       {viewMode && selectedService && (
         <ServiceDetailModal
           service={selectedService}
@@ -4329,6 +4882,55 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           getStatusColor={getStatusColor}
           getPriorityColor={getPriorityColor}
           getPaymentStatusColor={getPaymentStatusColor}
+        />
+      )}
+
+      {showShopClaimDetail && selectedShopClaim && (
+        <ShopClaimDetailModal
+          claim={selectedShopClaim}
+          onClose={() => {
+            setShowShopClaimDetail(false);
+            setSelectedShopClaim(null);
+          }}
+          getStatusColor={getShopClaimStatusColor}
+          getTypeColor={getShopClaimTypeColor}
+          getPriorityColor={getPriorityColor}
+        />
+      )}
+
+      {showSunToCompDetail && selectedSunToComp && (
+        <SunToCompDetailModal
+          battery={selectedSunToComp}
+          onClose={() => {
+            setShowSunToCompDetail(false);
+            setSelectedSunToComp(null);
+          }}
+          onEdit={() => {
+            setShowSunToCompDetail(false);
+            handleEditSunToComp(selectedSunToComp);
+          }}
+          getBatteryTypeColor={getBatteryTypeColor}
+          getConditionColor={getConditionColor}
+          getClaimColor={getClaimColor}
+          getTrackingStatusColor={getTrackingStatusColor}
+        />
+      )}
+
+      {showComptosunDetail && selectedComptosun && (
+        <ComptosunDetailModal
+          battery={selectedComptosun}
+          onClose={() => {
+            setShowComptosunDetail(false);
+            setSelectedComptosun(null);
+          }}
+          onEdit={() => {
+            setShowComptosunDetail(false);
+            handleEditComptosun(selectedComptosun);
+          }}
+          getBatteryTypeColor={getBatteryTypeColor}
+          getConditionColor={getConditionColor}
+          getClaimColor={getClaimColor}
+          getTrackingStatusColor={getTrackingStatusColor}
         />
       )}
 

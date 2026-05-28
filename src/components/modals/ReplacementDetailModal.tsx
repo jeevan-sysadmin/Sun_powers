@@ -211,8 +211,28 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
             padding: isMobile ? '20px' : '24px',
             maxHeight: 'calc(90vh - 140px)',
             overflowY: 'auto',
-            background: '#f8fafc'
+            background: 'linear-gradient(180deg, #f8fbff 0%, #f0f9ff 100%)'
           }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+              gap: '10px',
+              marginBottom: '16px'
+            }}>
+              <div className="summary-chip summary-chip-blue">
+                <span>Service</span>
+                <strong>{replacement.service_code || 'N/A'}</strong>
+              </div>
+              <div className="summary-chip summary-chip-green">
+                <span>Amount</span>
+                <strong>Rs {parseFloat(replacement.price || '0').toFixed(2)}</strong>
+              </div>
+              <div className="summary-chip summary-chip-purple">
+                <span>Installed</span>
+                <strong>{formatDate(replacement.installation_date)}</strong>
+              </div>
+            </div>
+
             <div className="detail-grid" style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
@@ -220,11 +240,11 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
             }}>
               {/* Customer Information Card */}
               <div className="detail-card" style={{
-                background: 'white',
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(240,249,255,0.75) 100%)',
                 borderRadius: '16px',
                 padding: isMobile ? '16px' : '20px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 20px rgba(37, 99, 235, 0.12)',
+                border: '1px solid #dbeafe',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}>
                 <div className="card-header" style={{
@@ -342,11 +362,11 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
 
               {/* Original Battery Card */}
               <div className="detail-card" style={{
-                background: 'white',
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(254,252,232,0.55) 100%)',
                 borderRadius: '16px',
                 padding: isMobile ? '16px' : '20px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 20px rgba(245, 158, 11, 0.12)',
+                border: '1px solid #fde68a',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}>
                 <div className="card-header" style={{
@@ -426,11 +446,11 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
 
               {/* Replacement Battery Card */}
               <div className="detail-card" style={{
-                background: 'white',
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(236,253,245,0.65) 100%)',
                 borderRadius: '16px',
                 padding: isMobile ? '16px' : '20px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 20px rgba(16, 185, 129, 0.14)',
+                border: '1px solid #bbf7d0',
                 transition: 'transform 0.2s, box-shadow 0.2s',
                 gridColumn: isMobile ? 'auto' : 'span 1'
               }}>
@@ -559,11 +579,11 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
 
               {/* Financial Information Card */}
               <div className="detail-card" style={{
-                background: 'white',
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(254,242,242,0.65) 100%)',
                 borderRadius: '16px',
                 padding: isMobile ? '16px' : '20px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 20px rgba(239, 68, 68, 0.12)',
+                border: '1px solid #fecaca',
                 transition: 'transform 0.2s, box-shadow 0.2s'
               }}>
                 <div className="card-header" style={{
@@ -613,7 +633,7 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
                       padding: '2px 10px',
                       borderRadius: '20px'
                     }}>
-                      ₹{parseFloat(replacement.price || '0').toFixed(2)}
+                      Rs {parseFloat(replacement.price || '0').toFixed(2)}
                     </span>
                   </div>
                   <div className="info-item" style={{
@@ -634,11 +654,11 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
               {replacement.notes && (
                 <div className="detail-card" style={{
                   gridColumn: isMobile ? 'auto' : '1 / -1',
-                  background: 'white',
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(241,245,249,0.7) 100%)',
                   borderRadius: '16px',
                   padding: isMobile ? '16px' : '20px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 10px 20px rgba(71, 85, 105, 0.12)',
+                  border: '1px solid #cbd5e1',
                   transition: 'transform 0.2s, box-shadow 0.2s'
                 }}>
                   <div className="card-header" style={{
@@ -734,6 +754,13 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
       </motion.div>
 
       <style>{`
+        :root {
+          --replacement-accent-1: #0ea5e9;
+          --replacement-accent-2: #2563eb;
+          --replacement-accent-3: #7c3aed;
+          --replacement-border: #dbeafe;
+        }
+
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -750,25 +777,89 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
         }
 
         .modal-content {
-          background: white;
+          background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
           border-radius: 24px;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 28px 60px -18px rgba(15, 23, 42, 0.45);
           max-height: 90vh;
           overflow: hidden;
           position: relative;
           width: 100%;
           max-width: 1100px;
+          border: 1px solid var(--replacement-border);
+        }
+
+        .replacement-detail-modal .modal-header {
+          background:
+            radial-gradient(circle at 12% 15%, rgba(14, 165, 233, 0.18), transparent 34%),
+            radial-gradient(circle at 88% 20%, rgba(124, 58, 237, 0.16), transparent 30%),
+            linear-gradient(90deg, #f0f9ff 0%, #eef2ff 55%, #ffffff 100%) !important;
+        }
+
+        .summary-chip {
+          border-radius: 12px;
+          padding: 10px 12px;
+          border: 1px solid #dbeafe;
+          background: #fff;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+        }
+
+        .summary-chip span {
+          font-size: 12px;
+          color: #64748b;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .summary-chip strong {
+          font-size: 14px;
+          color: #0f172a;
+          font-weight: 700;
+        }
+
+        .summary-chip-blue {
+          background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+          border-color: #bae6fd;
+        }
+
+        .summary-chip-green {
+          background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+          border-color: #bbf7d0;
+        }
+
+        .summary-chip-purple {
+          background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%);
+          border-color: #ddd6fe;
+        }
+
+        .status-badge {
+          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+
+        .date-info {
+          border: 1px solid #dbeafe;
+          box-shadow: 0 4px 10px rgba(59, 130, 246, 0.08);
         }
 
         /* Hover effects */
         .detail-card:hover {
           transform: translateY(-2px);
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+          box-shadow: 0 14px 24px -10px rgba(14, 116, 144, 0.28), 0 6px 12px -8px rgba(59, 130, 246, 0.25) !important;
         }
 
         .close-btn:hover {
           background: #7c3aed !important;
           box-shadow: 0 6px 10px -2px rgba(139, 92, 246, 0.4) !important;
+        }
+
+        .modal-footer .btn.close-btn {
+          background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%) !important;
+          border: 1px solid rgba(255,255,255,0.3) !important;
         }
 
         /* Tablet Styles */
@@ -788,6 +879,10 @@ const ReplacementDetailModal: React.FC<ReplacementDetailModalProps> = ({
           .modal-content {
             max-height: 95vh;
             border-radius: 24px 24px 0 0;
+          }
+
+          .summary-chip strong {
+            font-size: 13px;
           }
         }
 

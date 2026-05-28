@@ -23,10 +23,6 @@ import {
   FiPhone,
   FiHash,
   FiBattery,
-  FiCheckCircle,
-  FiClock,
-  FiAlertCircle,
-  FiTruck,
   FiMenu
 } from "react-icons/fi";
 import * as XLSX from 'xlsx';
@@ -70,7 +66,6 @@ interface ReplacementTabProps {
   onDeleteReplacement: (id: string) => void;
   onFilterWarrantyStatusChange: (status: string) => void;
   onRefresh: () => void;
-  getStatusColor: (status: string) => string;
   onSearchChange: (term: string) => void;
 }
 
@@ -84,7 +79,6 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
   onDeleteReplacement,
   onFilterWarrantyStatusChange,
   onRefresh,
-  getStatusColor,
   onSearchChange
 }) => {
   
@@ -121,11 +115,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
   
   // State for pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(() => {
-    if (window.innerWidth < 640) return 10;
-    if (window.innerWidth < 1024) return 12;
-    return 15;
-  });
+  const [itemsPerPage, setItemsPerPage] = useState<number>(-1);
   const [pageInput, setPageInput] = useState('1');
   
   // State for local search
@@ -135,7 +125,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
   
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const itemsPerPageOptions = [5, 10, 15, 20, 50, 100];
+  const itemsPerPageOptions = [5, 10, 15, 20, 50, 100, -1];
 
   // Responsive detection
   useEffect(() => {
@@ -246,7 +236,8 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
 
   // Apply all filters
   useEffect(() => {
-    let filtered = propFilteredReplacements.filter(replacement => {
+    const sourceData = propFilteredReplacements.length > 0 ? propFilteredReplacements : replacements;
+    let filtered = sourceData.filter(replacement => {
       // Search filter
       if (localSearchTerm) {
         const searchLower = localSearchTerm.toLowerCase();
@@ -282,10 +273,11 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
   }, [searchTerm]);
 
   // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const effectiveItemsPerPage = itemsPerPage === -1 ? Math.max(filteredData.length, 1) : itemsPerPage;
+  const indexOfLastItem = currentPage * effectiveItemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - effectiveItemsPerPage;
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / effectiveItemsPerPage);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
@@ -478,7 +470,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
       const headers = [
         'Service Code', 'Customer Name', 'Phone', 'Original Battery Model', 'Original Battery Serial',
         'New Battery Model', 'New Battery Serial', 'Brand', 'Type', 'Capacity', 'Voltage',
-        'Price', 'Warranty Period', 'Installation Date', 'Status', 'Warranty Status',
+        'Price', 'Warranty Period', 'Installation Date', 'Warranty Status',
         'Warranty Expiry', 'Notes', 'Created Date'
       ];
       
@@ -497,7 +489,6 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         parseFloat(replacement.price || '0').toFixed(2),
         replacement.warranty_period || 'N/A',
         formatDate(replacement.installation_date),
-        replacement.service_status,
         replacement.warranty_status || 'N/A',
         replacement.warranty_expiry_date ? formatDate(replacement.warranty_expiry_date) : 'N/A',
         replacement.notes || 'N/A',
@@ -549,7 +540,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
       }
 
       const headers = [
-        ['S.No', 'Service Code', 'Customer', 'Phone', 'Original Battery', 'New Battery', 'Type', 'Price', 'Install Date', 'Status']
+        ['S.No', 'Service Code', 'Customer', 'Phone', 'Original Battery', 'New Battery', 'Type', 'Price', 'Install Date']
       ];
       
       const tableData = dataToExport.map((replacement, index) => [
@@ -561,8 +552,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         replacement.battery_model,
         replacement.battery_type?.replace('_', ' ') || 'N/A',
         `₹${parseFloat(replacement.price || '0').toFixed(2)}`,
-        formatDate(replacement.installation_date),
-        replacement.service_status
+        formatDate(replacement.installation_date)
       ]);
 
       autoTable(doc, {
@@ -602,8 +592,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
           5: { cellWidth: 30 },
           6: { cellWidth: 25 },
           7: { cellWidth: 22, halign: 'right' },
-          8: { cellWidth: 22, halign: 'center' },
-          9: { cellWidth: 20, halign: 'center' }
+          8: { cellWidth: 22, halign: 'center' }
         },
         margin: { top: 45, left: 10, right: 10 },
         didDrawPage: (data) => {
@@ -655,7 +644,6 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
               th { background: #8b5cf6; color: white; padding: 12px; text-align: left; font-size: 12px; font-weight: 600; border: 1px solid #7c3aed; }
               td { padding: 10px; border: 1px solid #e2e8f0; font-size: 11px; vertical-align: middle; }
               tr:nth-child(even) { background: #f8fafc; }
-              .status-badge { padding: 4px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; display: inline-block; }
               .footer { margin-top: 30px; text-align: center; color: #64748b; font-size: 10px; border-top: 1px dashed #cbd5e1; padding-top: 20px; }
               .no-print { text-align: center; margin-top: 30px; padding: 20px; background: #f1f5f9; border-radius: 8px; }
               .no-print button { padding: 10px 25px; margin: 0 10px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; }
@@ -700,7 +688,6 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                     <th>Type</th>
                     <th>Price</th>
                     <th>Install Date</th>
-                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -716,7 +703,6 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                         <td>${replacement.battery_type?.replace('_', ' ') || 'N/A'}</td>
                         <td style="text-align: right;">₹${parseFloat(replacement.price || '0').toFixed(2)}</td>
                         <td>${formatDate(replacement.installation_date)}</td>
-                        <td>${replacement.service_status}</td>
                       </tr>
                     `;
                   }).join('')}
@@ -807,23 +793,6 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
     return pageNumbers;
   };
 
-  // Get status icon
-  const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'delivered':
-      case 'completed':
-        return <FiCheckCircle className="status-icon delivered" size={windowWidth < 640 ? 12 : 14} />;
-      case 'scheduled':
-        return <FiClock className="status-icon scheduled" size={windowWidth < 640 ? 12 : 14} />;
-      case 'in_progress':
-        return <FiTruck className="status-icon in-progress" size={windowWidth < 640 ? 12 : 14} />;
-      case 'pending':
-        return <FiAlertCircle className="status-icon pending" size={windowWidth < 640 ? 12 : 14} />;
-      default:
-        return <FiPackage className="status-icon" size={windowWidth < 640 ? 12 : 14} />;
-    }
-  };
-
   // Get responsive column visibility
   const getVisibleColumns = () => {
     if (windowWidth >= 1280) {
@@ -836,7 +805,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         newBattery: true,
         installationDate: true,
         price: true,
-        status: true,
+        status: false,
         actions: true
       };
     } else if (windowWidth >= 1024) {
@@ -849,7 +818,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         newBattery: true,
         installationDate: true,
         price: true,
-        status: true,
+        status: false,
         actions: true
       };
     } else if (windowWidth >= 768) {
@@ -862,7 +831,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         newBattery: true,
         installationDate: false,
         price: true,
-        status: true,
+        status: false,
         actions: true
       };
     } else {
@@ -875,7 +844,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         newBattery: true,
         installationDate: false,
         price: false,
-        status: true,
+        status: false,
         actions: true
       };
     }
@@ -961,8 +930,8 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
           </div>
         </div>
         
-        {/* Price and Status */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        {/* Price */}
+        <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '12px' }}>
           <span style={{ 
             fontSize: '16px', 
             fontWeight: '700', 
@@ -971,23 +940,6 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
             ₹{parseFloat(replacement.price || '0').toFixed(2)}
           </span>
           
-          <span 
-            className="status-badge"
-            style={{ 
-              backgroundColor: getStatusColor(replacement.service_status) + '20',
-              color: getStatusColor(replacement.service_status),
-              padding: '4px 8px',
-              borderRadius: '20px',
-              fontSize: '11px',
-              fontWeight: '600',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            {getStatusIcon(replacement.service_status)}
-            <span>{replacement.service_status}</span>
-          </span>
         </div>
         
         {/* Expanded Content */}
@@ -1090,10 +1042,10 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
   };
 
   return (
-    <div className="replacement-tab" style={{ 
+    <div className="replacement-tab replacement-lux" style={{ 
       padding: windowWidth < 640 ? '12px' : windowWidth < 1024 ? '16px' : '24px',
       minHeight: '100vh',
-      background: '#f9fafb'
+      background: 'linear-gradient(180deg, #f0f9ff 0%, #eef2ff 40%, #f8fafc 100%)'
     }}>
       {/* Delete Confirmation Modal */}
       {deleteModal.isOpen && (
@@ -1280,13 +1232,18 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
 
       {/* Desktop/Laptop Header */}
       {windowWidth >= 768 && (
-        <div className="section-header" style={{
+        <div className="section-header replacement-hero" style={{
           display: 'flex',
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '24px',
-          gap: '16px'
+          gap: '16px',
+          padding: windowWidth >= 1024 ? '18px 22px' : '14px 16px',
+          borderRadius: '16px',
+          border: '1px solid #dbeafe',
+          background: 'linear-gradient(90deg, #ffffff 0%, #ecfeff 45%, #eef2ff 100%)',
+          boxShadow: '0 10px 24px rgba(14, 116, 144, 0.12)'
         }}>
           <div className="section-title">
             <h2 style={{ 
@@ -1413,7 +1370,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
       )}
 
       {/* Stats Cards */}
-      <div className="stats-cards" style={{
+      <div className="stats-cards replacement-stats" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(1, 1fr)',
         gap: windowWidth < 640 ? '12px' : '16px',
@@ -1477,7 +1434,12 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         flexDirection: windowWidth < 768 ? 'column' : 'row',
         gap: '16px',
         marginBottom: '20px',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        background: 'rgba(255,255,255,0.88)',
+        border: '1px solid #dbeafe',
+        borderRadius: '14px',
+        boxShadow: '0 8px 20px rgba(30, 64, 175, 0.08)',
+        padding: windowWidth < 768 ? '12px' : '14px'
       }}>
         <div className="search-wrapper" style={{
           position: 'relative',
@@ -2049,11 +2011,12 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
             </div>
           ) : (
             /* Desktop/Tablet Table View */
-            <div className="table-wrapper" style={{
-              border: '1px solid #e2e8f0',
-              borderRadius: '12px',
+            <div className="table-wrapper replacement-table-shell" style={{
+              border: '1px solid #bfdbfe',
+              borderRadius: '16px',
               overflow: 'hidden',
               background: 'white',
+              boxShadow: '0 14px 30px rgba(30, 64, 175, 0.12)',
               marginBottom: '16px'
             }}>
               <div className="table-container" ref={tableContainerRef} style={{
@@ -2069,9 +2032,9 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                   <thead style={{
                     position: 'sticky',
                     top: 0,
-                    background: '#f8fafc',
+                    background: 'linear-gradient(90deg, #dbeafe 0%, #cffafe 50%, #e0e7ff 100%)',
                     zIndex: 10,
-                    borderBottom: '2px solid #e2e8f0'
+                    borderBottom: '2px solid #bfdbfe'
                   }}>
                     <tr>
                       {visibleColumns.checkbox && (
@@ -2098,31 +2061,28 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                         </th>
                       )}
                       {visibleColumns.serviceCode && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Service Code</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>Service Code</th>
                       )}
                       {visibleColumns.customer && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Customer</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>Customer</th>
                       )}
                       {visibleColumns.phone && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Phone</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>Phone</th>
                       )}
                       {visibleColumns.originalBattery && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Original Battery</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>Original Battery</th>
                       )}
                       {visibleColumns.newBattery && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>New Battery</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>New Battery</th>
                       )}
                       {visibleColumns.installationDate && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Install Date</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>Install Date</th>
                       )}
                       {visibleColumns.price && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Price</th>
-                      )}
-                      {visibleColumns.status && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Status</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>Price</th>
                       )}
                       {visibleColumns.actions && (
-                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '600', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>Actions</th>
+                        <th style={{ padding: windowWidth < 1024 ? '12px' : '16px', textAlign: 'left', fontWeight: '700', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>Actions</th>
                       )}
                     </tr>
                   </thead>
@@ -2133,12 +2093,12 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: index * 0.05 }}
-                        whileHover={{ backgroundColor: '#f5f3ff', cursor: 'pointer' }}
+                        whileHover={{ backgroundColor: '#eff6ff', cursor: 'pointer' }}
                         className={selectedReplacements.includes(replacement.id) ? 'selected-row' : ''}
                         onClick={(e) => handleRowClick(replacement, e)}
                         style={{
                           borderBottom: '1px solid #e2e8f0',
-                          backgroundColor: selectedReplacements.includes(replacement.id) ? '#f5f3ff' : 'white',
+                          backgroundColor: selectedReplacements.includes(replacement.id) ? '#e0f2fe' : 'white',
                           transition: 'background-color 0.2s'
                         }}
                       >
@@ -2166,7 +2126,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                           <td style={{ padding: windowWidth < 1024 ? '12px' : '16px' }}>
                             <span style={{ 
                               fontWeight: '600', 
-                              color: '#8b5cf6', 
+                              color: '#000000', 
                               fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem'
                             }}>
                               {replacement.service_code}
@@ -2178,7 +2138,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                             <div style={{ 
                               fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', 
                               fontWeight: '500',
-                              color: '#1f2937'
+                              color: '#000000'
                             }}>
                               {replacement.customer_name}
                             </div>
@@ -2191,7 +2151,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                               alignItems: 'center', 
                               gap: '4px', 
                               fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem',
-                              color: '#4b5563'
+                              color: '#000000'
                             }}>
                               <FiPhone size={windowWidth < 1024 ? 12 : 14} style={{ color: '#64748b' }} />
                               {replacement.customer_phone}
@@ -2203,7 +2163,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                             <div style={{ 
                               fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem',
                               fontWeight: '500',
-                              color: '#1f2937'
+                              color: '#000000'
                             }}>
                               {replacement.original_battery_model || 'N/A'}
                             </div>
@@ -2223,7 +2183,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                             <div style={{ 
                               fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem',
                               fontWeight: '500',
-                              color: '#1f2937'
+                              color: '#000000'
                             }}>
                               {replacement.battery_model}
                             </div>
@@ -2237,7 +2197,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                           </td>
                         )}
                         {visibleColumns.installationDate && (
-                          <td style={{ padding: windowWidth < 1024 ? '12px' : '16px', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#4b5563' }}>
+                          <td style={{ padding: windowWidth < 1024 ? '12px' : '16px', fontSize: windowWidth < 1024 ? '0.75rem' : '0.875rem', color: '#000000' }}>
                             {formatDate(replacement.installation_date)}
                           </td>
                         )}
@@ -2251,34 +2211,15 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                             ₹{parseFloat(replacement.price || '0').toFixed(2)}
                           </td>
                         )}
-                        {visibleColumns.status && (
-                          <td style={{ padding: windowWidth < 1024 ? '12px' : '16px' }}>
-                            <span 
-                              className="status-badge"
-                              style={{ 
-                                backgroundColor: getStatusColor(replacement.service_status) + '20',
-                                color: getStatusColor(replacement.service_status),
-                                padding: windowWidth < 1024 ? '4px 6px' : '4px 8px',
-                                borderRadius: '20px',
-                                fontSize: windowWidth < 1024 ? '0.7rem' : '0.75rem',
-                                fontWeight: '600',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              {getStatusIcon(replacement.service_status)}
-                              <span>{replacement.service_status}</span>
-                            </span>
-                          </td>
-                        )}
                         {visibleColumns.actions && (
                           <td style={{ padding: windowWidth < 1024 ? '12px' : '16px' }} onClick={(e) => e.stopPropagation()}>
                             <div className="action-buttons" style={{ display: 'flex', gap: '8px' }}>
                               <motion.button
                                 className="action-btn view"
-                                onClick={() => onViewReplacement(replacement)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onViewReplacement(replacement);
+                                }}
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.95 }}
                                 title="View Details"
@@ -2378,7 +2319,7 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
                     outline: 'none'
                   }}>
                     {itemsPerPageOptions.map(option => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option}>{option === -1 ? 'All' : option}</option>
                     ))}
                   </select>
                 </div>
@@ -2542,28 +2483,81 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         .spinning {
           animation: spin 1s linear infinite;
         }
+
+        .replacement-lux {
+          position: relative;
+        }
+
+        .replacement-lux::before {
+          content: '';
+          position: fixed;
+          inset: 0;
+          pointer-events: none;
+          background:
+            radial-gradient(circle at 10% 12%, rgba(14, 165, 233, 0.12), transparent 30%),
+            radial-gradient(circle at 88% 18%, rgba(99, 102, 241, 0.10), transparent 28%),
+            radial-gradient(circle at 70% 88%, rgba(16, 185, 129, 0.10), transparent 32%);
+          z-index: 0;
+        }
+
+        .replacement-hero,
+        .filters-section,
+        .table-wrapper,
+        .stats-cards {
+          position: relative;
+          z-index: 1;
+        }
+
+        .replacement-tab .replacements-table th {
+          color: #0f172a !important;
+        }
+
+        .replacement-tab .replacements-table td {
+          color: #111827;
+        }
+
+        .replacement-stats .stat-card {
+          border: 1px solid #dbeafe !important;
+          box-shadow: 0 10px 20px rgba(2, 132, 199, 0.09) !important;
+        }
+
+        .replacement-stats .stat-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 14px 26px rgba(37, 99, 235, 0.14) !important;
+        }
+
+        .section-actions .btn {
+          box-shadow: 0 6px 14px rgba(30, 64, 175, 0.16);
+          border: 1px solid rgba(255, 255, 255, 0.35) !important;
+        }
+
+        .search-input,
+        .filter-select {
+          border-color: #bfdbfe !important;
+          background: #ffffff !important;
+        }
         
         .search-input:focus {
-          border-color: #8b5cf6;
-          box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+          border-color: #0284c7;
+          box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
         }
         
         .filter-select:hover {
-          border-color: #8b5cf6;
+          border-color: #0284c7;
         }
         
         .filter-select:focus {
-          border-color: #8b5cf6;
-          box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.1);
+          border-color: #0284c7;
+          box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
         }
         
         .pagination-btn:hover:not(:disabled) {
-          background: #f3f4f6;
-          border-color: #8b5cf6;
+          background: #eff6ff;
+          border-color: #0284c7;
         }
         
         .pagination-btn.page-number.active:hover {
-          background: #7c3aed;
+          background: #0ea5e9;
         }
         
         .action-btn.view:hover {
@@ -2575,29 +2569,13 @@ const ReplacementTab: React.FC<ReplacementTabProps> = ({
         }
         
         .checkbox-btn:hover {
-          color: #8b5cf6;
+          color: #0284c7;
         }
         
         .selected-row {
-          background-color: #f5f3ff !important;
+          background-color: #e0f2fe !important;
         }
         
-        .status-icon.delivered {
-          color: #10b981;
-        }
-        
-        .status-icon.scheduled {
-          color: #8b5cf6;
-        }
-        
-        .status-icon.in-progress {
-          color: #f59e0b;
-        }
-        
-        .status-icon.pending {
-          color: #ef4444;
-        }
-
         @media (max-width: 768px) {
           .replacements-table th,
           .replacements-table td {

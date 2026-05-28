@@ -9,10 +9,6 @@ import {
   FiDollarSign,
   FiCalendar,
   FiInfo,
-  FiShoppingBag,
-  FiBriefcase,
-  FiArrowRight,
-  FiArrowLeft,
   FiCheckCircle,
   FiAlertCircle,
   FiTool,
@@ -415,13 +411,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     { value: "replaced", label: "Replaced", icon: FiBattery, description: "Battery has been replaced" }
   ];
   
-  const claimTypes = [
-    { value: "shop", label: "Shop", icon: FiShoppingBag, description: "Shop claim" },
-    { value: "company", label: "Company", icon: FiBriefcase, description: "Company claim" },
-    { value: "suntocomp", label: "Sun to Company", icon: FiArrowRight, description: "Sun Powers to Company" },
-    { value: "comptosun", label: "Company to Sun", icon: FiArrowLeft, description: "Company to Sun Powers" }
-  ];
-  
   const voltageOptions = ["12V", "24V", "48V", "other"];
   const conditions = ["excellent", "good", "fair", "poor", "dead"];
   const warrantyPeriods = ["6 months", "1 year", "2 years", "3 years", "5 years", "other"];
@@ -453,7 +442,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(2, 6, 23, 0.64)",
         display: "flex",
         alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
@@ -469,12 +458,13 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: isMobile ? "100%" : isTablet ? "90%" : "90%",
-          maxWidth: "1000px",
+          maxWidth: "1080px",
           maxHeight: "90vh",
           overflowY: "auto",
-          backgroundColor: "white",
-          borderRadius: isMobile ? "16px 16px 0 0" : "16px",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+          background: "linear-gradient(180deg, #f7fbff 0%, #ffffff 22%)",
+          borderRadius: isMobile ? "18px 18px 0 0" : "18px",
+          border: "1px solid #dbeafe",
+          boxShadow: "0 28px 48px rgba(15, 23, 42, 0.22)"
         }}
       >
         <style>
@@ -494,7 +484,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               }
               .modal-content {
                 animation: slideUp 0.3s ease-out;
-                border-radius: 16px 16px 0 0 !important;
+                border-radius: 18px 18px 0 0 !important;
               }
             }
             
@@ -514,6 +504,21 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             input.error, select.error, textarea.error {
               border-color: #ef4444 !important;
             }
+
+            .modal-content input,
+            .modal-content select,
+            .modal-content textarea {
+              border-color: #cbd5e1 !important;
+              border-radius: 10px !important;
+              transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            }
+
+            .modal-content input:focus,
+            .modal-content select:focus,
+            .modal-content textarea:focus {
+              border-color: #0f6fff !important;
+              box-shadow: 0 0 0 3px rgba(15, 111, 255, 0.14);
+            }
           `}
         </style>
         
@@ -522,12 +527,12 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: isMobile ? '16px' : '20px 24px',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid #bfdbfe',
           position: isMobile ? 'sticky' : 'static',
           top: 0,
-          backgroundColor: 'white',
+          background: 'linear-gradient(120deg, #0f6fff 0%, #0284c7 55%, #38bdf8 100%)',
           zIndex: 10,
-          borderRadius: isMobile ? '16px 16px 0 0' : '16px 16px 0 0'
+          borderRadius: isMobile ? '18px 18px 0 0' : '18px 18px 0 0'
         }}>
           <div className="modal-title">
             <h2 style={{ 
@@ -535,16 +540,16 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               alignItems: 'center',
               gap: '8px',
               fontSize: isMobile ? '1.2rem' : '1.5rem', 
-              fontWeight: '600', 
+              fontWeight: '700', 
               margin: '0 0 4px 0',
-              color: '#1f2937'
+              color: '#f8fafc'
             }}>
               <FiBattery size={isMobile ? 20 : 24} />
               {isEdit ? 'Edit Battery' : 'Add Battery'}
             </h2>
             <p style={{ 
               fontSize: isMobile ? '0.75rem' : '0.875rem', 
-              color: '#6b7280', 
+              color: '#dbeafe', 
               margin: 0 
             }}>
               {isEdit ? 'Update battery information' : 'Add one or many batteries with serial bubbles'}
@@ -560,7 +565,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               border: 'none',
               cursor: 'pointer',
               fontSize: isMobile ? '20px' : '24px',
-              color: '#6b7280',
+              color: '#e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -930,46 +935,6 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </select>
             </div>
 
-            {/* Claim Type */}
-            <div className="form-group" style={{ gridColumn: isMobile ? '1' : 'span 1' }}>
-              <label htmlFor="claim_type" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: isMobile ? '0.8rem' : '0.875rem',
-                fontWeight: '500',
-                color: '#4b5563',
-                marginBottom: '4px'
-              }}>
-                <FiBriefcase size={isMobile ? 14 : 16} /> Claim Type
-              </label>
-              <select
-                id="claim_type"
-                name="claim_type"
-                value={formData.claim_type}
-                onChange={handleChange}
-                className="claim-type-select"
-                style={{
-                  width: '100%',
-                  padding: isMobile ? '10px' : '12px',
-                  fontSize: isMobile ? '0.9rem' : '1rem',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  backgroundColor: 'white'
-                }}
-              >
-                {claimTypes.map(claim => (
-                  <option key={claim.value} value={claim.value}>
-                    {claim.label}
-                  </option>
-                ))}
-              </select>
-              <div className="field-description">
-                {claimTypes.find(claim => claim.value === formData.claim_type)?.description}
-              </div>
-            </div>
-
             <div className="form-group" style={{ gridColumn: isMobile ? '1' : 'span 1' }}>
               <label htmlFor="price" style={{
                 display: 'flex',
@@ -1279,8 +1244,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             justifyContent: 'flex-end',
             gap: isMobile ? '12px' : '16px',
             padding: isMobile ? '16px' : '20px 24px',
-            borderTop: '1px solid #e2e8f0',
-            backgroundColor: '#f8fafc',
+            borderTop: '1px solid #dbeafe',
+            background: 'linear-gradient(180deg, #f8fbff, #eef6ff)',
             position: isMobile ? 'sticky' : 'static',
             bottom: 0,
             zIndex: 10
@@ -1294,12 +1259,12 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               style={{
                 flex: isMobile ? 1 : 'none',
                 padding: isMobile ? '12px' : '10px 20px',
-                backgroundColor: 'transparent',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
+                backgroundColor: 'white',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
                 fontSize: isMobile ? '1rem' : '0.875rem',
-                fontWeight: '500',
-                color: '#4b5563',
+                fontWeight: '600',
+                color: '#334155',
                 cursor: 'pointer'
               }}
             >
@@ -1314,11 +1279,11 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               style={{
                 flex: isMobile ? 1 : 'none',
                 padding: isMobile ? '12px' : '10px 20px',
-                backgroundColor: '#3b82f6',
+                background: 'linear-gradient(120deg, #0f6fff, #0284c7)',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 fontSize: isMobile ? '1rem' : '0.875rem',
-                fontWeight: '500',
+                fontWeight: '700',
                 color: 'white',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 opacity: loading ? 0.7 : 1,

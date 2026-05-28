@@ -134,11 +134,7 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
   
   // State for pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(() => {
-    if (window.innerWidth < 640) return 5;
-    if (window.innerWidth < 1024) return 10;
-    return 15;
-  });
+  const [itemsPerPage, setItemsPerPage] = useState<number>(-1);
   const [pageInput, setPageInput] = useState('1');
   
   // State for local search
@@ -148,7 +144,8 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const itemsPerPageOptions = [5, 10, 15, 20, 50, 100];
+  const itemsPerPageOptions = [5, 10, 15, 20, 50, 100, -1];
+  const normalizeValue = (value: any): string => `${value ?? ''}`.trim().toLowerCase().replace(/\s+/g, '_');
 
   const dateFilterOptions = [
     { value: 'all', label: 'All Dates' },
@@ -255,7 +252,8 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
 
   // Filter claims based on all filters
   useEffect(() => {
-    let filtered = filteredClaims.filter(claim => {
+    const sourceData = filteredClaims.length > 0 ? filteredClaims : claims;
+    let filtered = sourceData.filter(claim => {
       // Search filter
       if (localSearchTerm) {
         const searchLower = localSearchTerm.toLowerCase();
@@ -272,7 +270,7 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
       }
       
       // Type filter
-      if (filterType !== 'all' && claim.claim_type !== filterType) {
+      if (filterType !== 'all' && normalizeValue(claim.claim_type) !== normalizeValue(filterType)) {
         return false;
       }
       
@@ -289,13 +287,14 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
     if (tableContainerRef.current) {
       tableContainerRef.current.scrollTop = 0;
     }
-  }, [filteredClaims, localSearchTerm, filterType, dateFilterType, customDateRange, selectedYear, selectedMonth]);
+  }, [claims, filteredClaims, localSearchTerm, filterType, dateFilterType, customDateRange, selectedYear, selectedMonth]);
 
   // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const effectiveItemsPerPage = itemsPerPage === -1 ? Math.max(filteredData.length, 1) : itemsPerPage;
+  const indexOfLastItem = currentPage * effectiveItemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - effectiveItemsPerPage;
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / effectiveItemsPerPage);
 
   // Handle select all
   const handleSelectAll = () => {
@@ -889,29 +888,35 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
           </motion.div>
         )}
         
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
           <motion.button 
             className="action-btn view"
             onClick={(e) => {
               e.stopPropagation();
               onViewClaim(claim);
             }}
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.9 }}
             style={{
-              width: '36px',
+              flex: 1,
               height: '36px',
               borderRadius: '8px',
               border: 'none',
-              background: '#e0f2fe',
-              color: '#0284c7',
+              background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+              color: '#ffffff',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              boxShadow: '0 6px 14px rgba(37, 99, 235, 0.25)'
             }}
+            title="View Details"
           >
             <FiEye size={18} />
+            <span>View Details</span>
           </motion.button>
           
           <motion.button 
@@ -1298,11 +1303,27 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
                             <motion.button 
                               className="action-btn view"
                               onClick={() => onViewClaim(claim)}
-                              whileHover={{ scale: 1.1 }}
+                              whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.9 }}
                               title="View Details"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                width: 'auto',
+                                height: '32px',
+                                borderRadius: '999px',
+                                padding: '0 12px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)',
+                                color: '#fff',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                boxShadow: '0 4px 10px rgba(37, 99, 235, 0.25)'
+                              }}
                             >
                               <FiEye />
+                              <span>View</span>
                             </motion.button>
                             <motion.button 
                               className="action-btn delete"
@@ -1347,7 +1368,7 @@ const ShopClaimTab: React.FC<ShopClaimTabProps> = ({
                   <span>Show:</span>
                   <select value={itemsPerPage} onChange={handleItemsPerPageChange}>
                     {itemsPerPageOptions.map(option => (
-                      <option key={option} value={option}>{option}</option>
+                      <option key={option} value={option}>{option === -1 ? 'All' : option}</option>
                     ))}
                   </select>
                 </div>

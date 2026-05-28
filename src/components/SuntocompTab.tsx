@@ -64,6 +64,7 @@ interface Battery {
   shop_stock_quantity?: string;
   company_stock_quantity?: string;
   tracking_status?: string;
+  customer_name?: string;
 }
 
 interface SuntocompTabProps {
@@ -850,6 +851,9 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: '600', color: '#f59e0b', fontSize: '14px' }}>{battery.battery_code}</div>
             <div style={{ fontSize: '12px', color: '#64748b' }}>{battery.battery_model}</div>
+            <div style={{ fontSize: '11px', color: '#334155', marginTop: '2px' }}>
+              Client: {battery.customer_name || 'N/A'}
+            </div>
           </div>
           
           <div style={{ fontSize: '18px', color: '#94a3b8' }}>
@@ -939,6 +943,11 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Purchase Date</div>
               <div style={{ fontSize: '13px' }}>{formatDate(battery.purchase_date || '')}</div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Created Date</div>
+              <div style={{ fontSize: '13px' }}>{formatDate(battery.created_at || '')}</div>
             </div>
             
             <div style={{ marginBottom: '12px' }}>
@@ -1314,11 +1323,13 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
                       </th>
                       <th>Battery Code</th>
                       <th>Model & Serial</th>
+                      <th>Client</th>
                       {windowWidth >= 1024 && <th>Brand</th>}
                       <th>Type</th>
                       <th>Condition</th>
                       <th>Status</th>
                       {windowWidth >= 1024 && <th>Purchase Date</th>}
+                      <th>Created Date</th>
                       <th>Price</th>
                       <th>Actions</th>
                     </tr>
@@ -1353,6 +1364,9 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
                               <span className="product-serial">{battery.battery_serial}</span>
                             </div>
                           </div>
+                        </td>
+                        <td>
+                          <span className="product-brand">{battery.customer_name || 'N/A'}</span>
                         </td>
                         {windowWidth >= 1024 && (
                           <td>
@@ -1399,6 +1413,11 @@ const SuntocompTab: React.FC<SuntocompTabProps> = ({
                             </span>
                           </td>
                         )}
+                        <td>
+                          <span className="created-date">
+                            {formatDate(battery.created_at || '')}
+                          </span>
+                        </td>
                         <td>
                           <span className="product-price" style={{ color: '#059669', fontWeight: '600' }}>
                             {formatCurrency(battery.price)}

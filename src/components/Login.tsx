@@ -102,12 +102,13 @@ function CosmicBackground() {
 // API login function
 async function apiLogin(email: string, password: string): Promise<LoginResponse> {
   const loginData = { email, password };
+  const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string) || "/api";
 
   console.log("Attempting login with:", { email });
   
   try {
-    // Use the correct endpoint
-    const endpoint = "http://localhost/sun_powers/api/login.php";
+    // Use env-configured API base or Vite proxy fallback
+    const endpoint = `${apiBaseUrl}/login.php`;
     
     console.log(`Connecting to: ${endpoint}`);
     

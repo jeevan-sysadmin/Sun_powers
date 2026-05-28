@@ -172,6 +172,31 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
             </div>
           </div>
 
+          <div className="meta-ribbon">
+            <div className="meta-pill">
+              <FiPackage />
+              <span>{delivery.delivery_type?.replace('_', ' ').toUpperCase()}</span>
+            </div>
+            <div className="meta-pill">
+              <FiMapPin />
+              <span>{delivery.address || 'Address not available'}</span>
+            </div>
+            <div className="meta-pill">
+              <FiCalendar />
+              <span>Created: {formatDate(delivery.created_at)}</span>
+            </div>
+            <div className="meta-pill">
+              <FiClock />
+              <span>Updated: {formatDate(delivery.updated_at)}</span>
+            </div>
+            {delivery.delivered_date && (
+              <div className="meta-pill">
+                <FiCheckCircle />
+                <span>Delivered: {formatDate(delivery.delivered_date)}</span>
+              </div>
+            )}
+          </div>
+
           <div className="delivery-detail-grid">
             {/* Delivery Information */}
             <div className="detail-section">
@@ -289,8 +314,8 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(5px);
+          background: rgba(2, 6, 23, 0.64);
+          backdrop-filter: blur(8px);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -299,9 +324,10 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
         }
 
         .modal-content {
-          background: white;
+          background: linear-gradient(180deg, #f8fbff 0%, #ffffff 20%);
           border-radius: 20px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+          border: 1px solid #dbeafe;
+          box-shadow: 0 30px 55px rgba(15, 23, 42, 0.24);
           max-height: 90vh;
           overflow-y: auto;
           position: relative;
@@ -317,10 +343,10 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           justify-content: space-between;
           align-items: center;
           padding: 1.5rem 2rem;
-          border-bottom: 1px solid #eef2f6;
+          border-bottom: 1px solid #bfdbfe;
           position: sticky;
           top: 0;
-          background: white;
+          background: linear-gradient(120deg, #0f6fff 0%, #0284c7 55%, #38bdf8 100%);
           z-index: 10;
           border-radius: 20px 20px 0 0;
         }
@@ -328,12 +354,13 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
         .modal-title h2 {
           margin: 0;
           font-size: 1.5rem;
-          color: #1a1f36;
+          color: #f8fafc;
+          font-weight: 800;
         }
 
         .modal-title p {
           margin: 0.25rem 0 0;
-          color: #6b7280;
+          color: #dbeafe;
           font-size: 0.875rem;
         }
 
@@ -342,7 +369,7 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           border: none;
           font-size: 1.5rem;
           cursor: pointer;
-          color: #6b7280;
+          color: #e2e8f0;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -352,11 +379,11 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
         }
 
         .close-btn:hover {
-          background-color: #f3f4f6;
+          background-color: rgba(255, 255, 255, 0.18);
         }
 
         .delivery-detail-content {
-          padding: 2rem;
+          padding: 1.4rem;
         }
 
         .status-bar {
@@ -365,8 +392,9 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           align-items: center;
           margin-bottom: 2rem;
           padding: 1rem;
-          background: #f8fafc;
-          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(15, 111, 255, 0.12), rgba(56, 189, 248, 0.1));
+          border-radius: 14px;
+          border: 1px solid rgba(15, 111, 255, 0.2);
           flex-wrap: wrap;
           gap: 1rem;
         }
@@ -379,6 +407,32 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           border-radius: 100px;
           font-weight: 600;
           font-size: 1rem;
+        }
+
+        .meta-ribbon {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 10px;
+          margin-bottom: 1rem;
+        }
+
+        .meta-pill {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid #dbeafe;
+          border-radius: 10px;
+          padding: 10px 12px;
+          background: linear-gradient(180deg, #ffffff, #f8fbff);
+          color: #0f172a;
+          font-size: 12px;
+          font-weight: 600;
+          min-height: 40px;
+        }
+
+        .meta-pill svg {
+          color: #0284c7;
+          flex-shrink: 0;
         }
 
         .status-actions {
@@ -436,9 +490,10 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
         }
 
         .detail-section {
-          background: #f8fafc;
+          background: linear-gradient(180deg, #ffffff, #f8fbff);
           padding: 1.25rem;
-          border-radius: 12px;
+          border-radius: 14px;
+          border: 1px solid #dbeafe;
         }
 
         .detail-section.full-width {
@@ -451,7 +506,8 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           gap: 0.5rem;
           margin: 0 0 1rem;
           font-size: 1rem;
-          color: #4b5563;
+          color: #0f172a;
+          font-weight: 700;
         }
 
         .detail-item {
@@ -463,11 +519,11 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
 
         .detail-label {
           min-width: 120px;
-          color: #6b7280;
+          color: #475569;
         }
 
         .detail-value {
-          color: #1f2937;
+          color: #0f172a;
           font-weight: 500;
           flex: 1;
           word-break: break-word;
@@ -522,7 +578,7 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           justify-content: center;
           margin-top: 2rem;
           padding-top: 1.5rem;
-          border-top: 1px solid #eef2f6;
+          border-top: 1px solid #dbeafe;
         }
 
         /* Tablet Styles */
@@ -590,6 +646,10 @@ const DeliveryDetailModal: React.FC<DeliveryDetailModalProps> = ({
           .delivery-detail-grid {
             grid-template-columns: 1fr;
             gap: 1rem;
+          }
+
+          .meta-ribbon {
+            grid-template-columns: 1fr;
           }
 
           .status-bar {

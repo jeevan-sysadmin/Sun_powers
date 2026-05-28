@@ -245,9 +245,10 @@ const SpareDetailModal: React.FC<SpareDetailModalProps> = ({
         overflowY: "auto" as const,
         margin: isMobile ? "10px" : "0",
         width: "100%",
-        backgroundColor: "white",
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+        border: "1px solid #bfdbfe",
         borderRadius: isMobile ? "16px 16px 0 0" : "16px",
-        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+        boxShadow: "0 32px 64px -24px rgba(15, 23, 42, 0.45)"
     };
 
     return (
@@ -263,7 +264,8 @@ const SpareDetailModal: React.FC<SpareDetailModalProps> = ({
                 left: 0,
                 right: 0,
                 bottom: 0,
-                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                background:
+                    "radial-gradient(circle at 12% 10%, rgba(16, 185, 129, 0.18), rgba(0, 0, 0, 0.62)), radial-gradient(circle at 88% 15%, rgba(14, 165, 233, 0.16), rgba(0, 0, 0, 0.62))",
                 display: "flex",
                 alignItems: isMobile ? "flex-end" : "center",
                 justifyContent: "center",
@@ -314,16 +316,17 @@ const SpareDetailModal: React.FC<SpareDetailModalProps> = ({
                         }
                         
                         .detail-section {
-                            background: #ffffff;
-                            border: 1px solid #e2e8f0;
+                            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(240,249,255,0.7) 100%);
+                            border: 1px solid #dbeafe;
                             border-radius: 12px;
                             padding: 16px;
                             transition: all 0.2s;
+                            box-shadow: 0 8px 18px rgba(30, 64, 175, 0.08);
                         }
                         
                         .detail-section:hover {
-                            border-color: #cbd5e1;
-                            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                            border-color: #93c5fd;
+                            box-shadow: 0 14px 24px rgba(14, 116, 144, 0.16);
                         }
                         
                         @media (max-width: 767px) {
@@ -386,6 +389,7 @@ const SpareDetailModal: React.FC<SpareDetailModalProps> = ({
                             font-size: 12px;
                             font-weight: 600;
                             white-space: nowrap;
+                            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
                         }
                         
                         @media (max-width: 767px) {
@@ -432,7 +436,7 @@ const SpareDetailModal: React.FC<SpareDetailModalProps> = ({
                         
                         .progress-bar {
                             height: 8px;
-                            background: #e2e8f0;
+                            background: #dbeafe;
                             border-radius: 4px;
                             overflow: hidden;
                             margin: 8px 0;
@@ -455,7 +459,7 @@ const SpareDetailModal: React.FC<SpareDetailModalProps> = ({
                     borderBottom: '1px solid #e2e8f0',
                     position: isMobile ? 'sticky' : 'static',
                     top: 0,
-                    backgroundColor: 'white',
+                    background: 'linear-gradient(90deg, #ecfeff 0%, #ecfdf5 45%, #eef2ff 100%)',
                     zIndex: 10,
                     borderRadius: isMobile ? '16px 16px 0 0' : '16px 16px 0 0'
                 }}>
@@ -486,17 +490,18 @@ const SpareDetailModal: React.FC<SpareDetailModalProps> = ({
                         whileHover={{ rotate: 90 }}
                         whileTap={{ scale: 0.9 }}
                         style={{
-                            background: 'none',
-                            border: 'none',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
                             cursor: 'pointer',
                             fontSize: isMobile ? '20px' : '24px',
-                            color: '#6b7280',
+                            color: '#334155',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             padding: isMobile ? '8px' : '4px',
                             borderRadius: '8px',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
+                            boxShadow: '0 4px 10px rgba(51, 65, 85, 0.12)'
                         }}
                         title="Close"
                     >

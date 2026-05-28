@@ -193,16 +193,17 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
   const typeColor = getTypeColor(claim.claim_type);
   const priorityColor = getPriorityColor(claim.priority);
 
-  // Modal styles based on screen size
+  // Popup styles
   const modalContentStyle = {
-    maxWidth: isMobile ? "95%" : isTablet ? "90%" : "800px",
-    maxHeight: "90vh",
+    maxWidth: isMobile ? "96%" : isTablet ? "92%" : "980px",
+    maxHeight: isMobile ? "92vh" : "90vh",
     overflowY: "auto" as const,
-    margin: isMobile ? "10px" : "0",
+    margin: isMobile ? "8px" : "0",
     width: "100%",
+    height: "auto",
     backgroundColor: "white",
-    borderRadius: isMobile ? "16px 16px 0 0" : "16px",
-    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+    borderRadius: isMobile ? "18px" : "16px",
+    boxShadow: "0 24px 48px rgba(2, 6, 23, 0.28)"
   };
 
   // Mobile tabs
@@ -786,12 +787,12 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(15, 23, 42, 0.5)",
         display: "flex",
         alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
         zIndex: 1000,
-        padding: isMobile ? "0" : "20px",
+        padding: isMobile ? "0" : "16px",
         backdropFilter: "blur(4px)"
       }}
     >
@@ -805,36 +806,7 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
       >
         <style>
           {`
-            @keyframes slideUp {
-              from {
-                transform: translateY(100%);
-              }
-              to {
-                transform: translateY(0);
-              }
-            }
-            
-            @media (max-width: 767px) {
-              .modal-overlay {
-                align-items: flex-end !important;
-              }
-              .modal-content {
-                animation: slideUp 0.3s ease-out;
-                border-radius: 16px 16px 0 0 !important;
-              }
-            }
-            
-            @media (min-width: 768px) and (max-width: 1023px) {
-              .modal-content {
-                max-width: 90% !important;
-              }
-            }
-            
-            @media (min-width: 1024px) {
-              .modal-content {
-                max-width: 800px !important;
-              }
-            }
+            .shop-claim-fullpage-shell { width: 100%; }
             
             .detail-section {
               background: #ffffff;
@@ -890,9 +862,28 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
             .modal-tab.active svg {
               color: white !important;
             }
+
+            .shop-claim-main-grid {
+              display: grid;
+              grid-template-columns: 1fr;
+              gap: 16px;
+            }
+
+            @media (min-width: 1200px) {
+              .shop-claim-main-grid {
+                grid-template-columns: 1fr 340px;
+                align-items: start;
+              }
+            }
+
+            .shop-claim-side-panel {
+              position: sticky;
+              top: 12px;
+            }
           `}
         </style>
-        
+
+        <div className="shop-claim-fullpage-shell">
         {/* Modal Header */}
         <div className="modal-header" style={{
           display: 'flex',
@@ -901,10 +892,10 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
           padding: isMobile ? '16px' : '20px 24px',
           borderBottom: '1px solid #e2e8f0',
           position: isMobile ? 'sticky' : 'static',
-          top: 0,
+          top: isMobile ? 0 : 'auto',
           backgroundColor: 'white',
           zIndex: 10,
-          borderRadius: isMobile ? '16px 16px 0 0' : '16px 16px 0 0'
+          borderRadius: isMobile ? '18px 18px 0 0' : '16px 16px 0 0'
         }}>
           <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div className="header-icon" style={{
@@ -1001,38 +992,56 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
         {/* Modal Body */}
         <div className="modal-body" style={{
           padding: isMobile ? '16px' : '24px',
-          maxHeight: isMobile ? 'calc(90vh - 200px)' : 'calc(90vh - 200px)',
+          maxHeight: isMobile ? 'calc(92vh - 205px)' : 'calc(90vh - 215px)',
           overflowY: 'auto'
         }}>
-          {renderTabContent()}
+          <div className="shop-claim-main-grid">
+            <div>
+              {renderTabContent()}
+            </div>
 
-          {/* System Information - Always visible at bottom */}
-          <div className="detail-section" style={{ marginTop: '16px' }}>
-            <h3 style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: isMobile ? '0.9rem' : '1rem',
-              fontWeight: '600',
-              color: '#334155',
-              marginBottom: '12px',
-              paddingBottom: '8px',
-              borderBottom: '2px solid #3b82f6'
-            }}>
-              <FiInfo size={isMobile ? 16 : 18} /> System Information
-            </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748b' }}>
-                <FiCalendar size={12} />
-                <span>Created: {formatDateTime(claim.created_at)}</span>
+            <div className="shop-claim-side-panel">
+              <div className="detail-section">
+                <h3 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: isMobile ? '0.9rem' : '1rem',
+                  fontWeight: '600',
+                  color: '#334155',
+                  marginBottom: '12px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #3b82f6'
+                }}>
+                  <FiInfo size={isMobile ? 16 : 18} /> Quick Summary
+                </h3>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <div className="detail-item"><span>Status</span><span style={{ color: statusColor, fontWeight: 600 }}>{claim.status?.replace('_', ' ').toUpperCase() || 'N/A'}</span></div>
+                  <div className="detail-item"><span>Priority</span><span style={{ color: priorityColor, fontWeight: 600 }}>{claim.priority?.toUpperCase() || 'N/A'}</span></div>
+                  <div className="detail-item"><span>Type</span><span style={{ color: typeColor, fontWeight: 600 }}>{claim.claim_type?.replace('_', ' ').toUpperCase() || 'N/A'}</span></div>
+                  <div className="detail-item"><span>Claim Code</span><span style={{ fontFamily: 'monospace' }}>{claim.claim_code}</span></div>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748b' }}>
-                <FiClock size={12} />
-                <span>Updated: {formatDateTime(claim.updated_at)}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748b' }}>
-                <FiTag size={12} />
-                <span>ID: #{claim.id}</span>
+
+              <div className="detail-section" style={{ marginTop: '12px' }}>
+                <h3 style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: isMobile ? '0.9rem' : '1rem',
+                  fontWeight: '600',
+                  color: '#334155',
+                  marginBottom: '12px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #3b82f6'
+                }}>
+                  <FiClock size={isMobile ? 16 : 18} /> System Information
+                </h3>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  <div className="detail-item"><span>Created</span><span>{formatDateTime(claim.created_at)}</span></div>
+                  <div className="detail-item"><span>Updated</span><span>{formatDateTime(claim.updated_at)}</span></div>
+                  <div className="detail-item"><span>Record ID</span><span>#{claim.id}</span></div>
+                </div>
               </div>
             </div>
           </div>
@@ -1046,7 +1055,7 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
           padding: isMobile ? '16px' : '20px 24px',
           borderTop: '1px solid #e2e8f0',
           background: '#f8fafc',
-          borderRadius: '0 0 16px 16px',
+          borderRadius: isMobile ? '0 0 18px 18px' : '0 0 16px 16px',
           flexWrap: 'wrap',
           gap: '12px'
         }}>
@@ -1082,6 +1091,7 @@ const ShopClaimDetailModal: React.FC<ShopClaimDetailModalProps> = ({
               <FiX size={isMobile ? 18 : 16} /> Close
             </motion.button>
           </div>
+        </div>
         </div>
       </motion.div>
     </motion.div>

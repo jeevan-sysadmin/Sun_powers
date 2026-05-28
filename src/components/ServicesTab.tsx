@@ -50,6 +50,7 @@ interface ServiceOrder {
   battery_serial: string;
   original_battery_ids?: string;
   original_battery_serials?: string;
+  original_battery_models?: string;
   inverter_model: string;
   inverter_serial: string;
   issue_description: string;
@@ -72,6 +73,9 @@ interface ServiceOrder {
   payment_method?: string;
   tax_amount?: string;
   discount_amount?: string;
+  battery_claim?: string | null;
+  battery_claims_json?: string;
+  battery_statuses_json?: string;
 }
 
 interface ServicesTabProps {
@@ -333,6 +337,15 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
     return days === 0 ? 'Today' : `${days} day${days > 1 ? 's' : ''}`;
   };
 
+  const getClaimTypeLabel = (claim?: string | null): string => {
+    const normalized = (claim || '').toLowerCase();
+    if (normalized === 'shop') return 'Shop';
+    if (normalized === 'company') return 'Company';
+    if (normalized === 'suntocomp') return 'Sun To Company';
+    if (normalized === 'comptosun') return 'Company To Sun';
+    return 'Non Claim';
+  };
+
   const getDateRangeText = (): string => {
     switch (dateFilterType) {
       case 'today':
@@ -501,7 +514,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
       const headers = [
         'Service Code', 'Customer Name', 'Phone', 'Email', 'Address',
         'Battery Model', 'Battery Serial', 'Inverter Model', 'Inverter Serial',
-        'Issue Description', 'Status', 'Priority', 'Payment Status',
+        'Issue Description', 'Claim Type', 'Status', 'Priority', 'Payment Status',
         'Estimated Cost', 'Final Cost', 'Deposit Amount', 'Tax Amount', 'Discount',
         'Created Date', 'Service Date', 'Completed Date', 'Warranty Status', 'AMC Status',
         'Service Staff', 'Notes'
@@ -513,11 +526,12 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         service.customer_phone,
         service.customer_email || 'N/A',
         service.customer_address || 'N/A',
-        service.battery_model || 'N/A',
+        service.original_battery_models || service.battery_model || 'N/A',
         service.original_battery_serials || service.battery_serial || 'N/A',
         service.inverter_model || 'N/A',
         service.inverter_serial || 'N/A',
         service.issue_description || 'N/A',
+        getClaimTypeLabel(service.battery_claim),
         service.status,
         service.priority,
         service.payment_status,
@@ -547,256 +561,193 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
 
   const generateServiceReceipt = (service: ServiceOrder) => {
     try {
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const primary = [2, 132, 199] as const;
+      const dark = [15, 23, 42] as const;
+      const muted = [100, 116, 139] as const;
+      const pageWidth = 210;
+      const margin = 14;
+      const contentWidth = pageWidth - margin * 2;
+      const receiptNo = `SRV-${service.id.toString().padStart(6, '0')}`;
+      const serviceDate = service.service_date ? formatDate(service.service_date) : formatDate(service.created_at);
+      const finalAmount = parseFloat(service.final_cost || service.estimated_cost || '0') || 0;
+      const estimatedAmount = parseFloat(service.estimated_cost || '0') || 0;
+      const depositAmount = parseFloat(service.deposit_amount || '0') || 0;
+      const taxAmount = parseFloat(service.tax_amount || '0') || 0;
+      const discountAmount = parseFloat(service.discount_amount || '0') || 0;
+      const balanceAmount = Math.max(0, finalAmount - depositAmount);
 
-      // Header
-      doc.setFillColor(16, 185, 129);
-      doc.rect(0, 0, 210, 35, 'F');
+      doc.setFillColor(2, 132, 199);
+      doc.rect(0, 0, pageWidth, 38, 'F');
+      doc.setFillColor(255, 255, 255);
+      doc.circle(18, 19, 6, 'F');
+      doc.setFillColor(2, 132, 199);
+      doc.circle(18, 19, 2.7, 'F');
 
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
       doc.setFont('helvetica', 'bold');
-      doc.text('SUN POWERS', 105, 15, { align: 'center' });
-      
+      doc.setFontSize(21);
+      doc.text('SUN POWERS', 28, 15);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('Battery & Inverter Service Center', 105, 22, { align: 'center' });
-      doc.text('123, Electronics City, Bangalore - 560100 | Tel: +91 9876543210', 105, 28, { align: 'center' });
-
-      doc.setTextColor(16, 185, 129);
-      doc.setFontSize(18);
+      doc.text('Battery & Inverter Service Center', 28, 21);
+      doc.text('Tirunelveli, Tamil Nadu | +91 9994445237', 28, 27);
       doc.setFont('helvetica', 'bold');
-      doc.text('SERVICE RECEIPT', 105, 45, { align: 'center' });
-
-      // Receipt Info Box
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.1);
-      doc.rect(20, 50, 170, 22);
-
-      doc.setTextColor(75, 85, 99);
+      doc.setFontSize(14);
+      doc.text('SERVICE RECEIPT', pageWidth - margin, 16, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
+      doc.text(`Generated: ${formatDateTime(new Date().toISOString())}`, pageWidth - margin, 22, { align: 'right' });
+
+      let y = 46;
+      doc.setDrawColor(220, 231, 241);
+      doc.setFillColor(248, 251, 255);
+      doc.roundedRect(margin, y, contentWidth, 22, 2.5, 2.5, 'FD');
+
+      doc.setTextColor(...muted);
+      doc.setFontSize(8.5);
       doc.setFont('helvetica', 'bold');
-      
-      doc.text('Receipt No:', 25, 58);
-      doc.text('Date:', 25, 65);
-      doc.text('Service Code:', 25, 72);
-      
+      doc.text('Receipt No', margin + 4, y + 7);
+      doc.text('Service Code', margin + 4, y + 15);
+      doc.text('Receipt Date', margin + 75, y + 7);
+      doc.text('Service Date', margin + 75, y + 15);
+      doc.text('Payment Status', margin + 142, y + 7);
+      doc.text('Priority', margin + 142, y + 15);
+
+      doc.setTextColor(...dark);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(`SRV-${new Date().getTime().toString().slice(-8)}`, 60, 58);
-      doc.text(formatDateTime(new Date().toISOString()), 60, 65);
-      doc.text(service.service_code, 60, 72);
+      doc.text(receiptNo, margin + 35, y + 7);
+      doc.text(service.service_code || 'N/A', margin + 35, y + 15);
+      doc.text(formatDateTime(new Date().toISOString()), margin + 103, y + 7);
+      doc.text(serviceDate, margin + 103, y + 15);
+      doc.text((service.payment_status || 'pending').replace(/_/g, ' ').toUpperCase(), margin + 174, y + 7, { align: 'right' });
+      doc.text((service.priority || 'normal').toUpperCase(), margin + 174, y + 15, { align: 'right' });
 
+      y += 30;
+      const leftColW = 118;
+      const rightColW = contentWidth - leftColW - 4;
+
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, y, leftColW, 44, 2, 2, 'S');
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(75, 85, 99);
-      doc.text('Status:', 120, 58);
-      doc.text('Priority:', 120, 65);
-      doc.text('Payment:', 120, 72);
-
+      doc.setTextColor(...primary);
+      doc.setFontSize(10);
+      doc.text('Customer Details', margin + 4, y + 7);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...muted);
+      doc.text('Name', margin + 4, y + 14);
+      doc.text('Phone', margin + 4, y + 21);
+      doc.text('Email', margin + 4, y + 28);
+      doc.text('Address', margin + 4, y + 35);
+      doc.setTextColor(...dark);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(getStatusColor(service.status));
-      doc.text(service.status.replace(/_/g, ' ').toUpperCase(), 150, 58);
-      doc.setTextColor(getPriorityColor(service.priority));
-      doc.text(service.priority.toUpperCase(), 150, 65);
-      doc.setTextColor(getPaymentStatusColor(service.payment_status));
-      doc.text(service.payment_status.replace(/_/g, ' ').toUpperCase(), 150, 72);
+      doc.text(service.customer_name || 'N/A', margin + 28, y + 14);
+      doc.text(service.customer_phone || 'N/A', margin + 28, y + 21);
+      doc.text(service.customer_email || 'Not provided', margin + 28, y + 28);
+      const addressLines = doc.splitTextToSize(service.customer_address || 'Not provided', leftColW - 32);
+      doc.text(addressLines, margin + 28, y + 35);
 
-      // Customer Information
-      doc.setTextColor(16, 185, 129);
-      doc.setFontSize(12);
+      doc.roundedRect(margin + leftColW + 4, y, rightColW, 44, 2, 2, 'S');
       doc.setFont('helvetica', 'bold');
-      doc.text('CUSTOMER INFORMATION', 20, 85);
-
-      doc.setDrawColor(16, 185, 129);
-      doc.setLineWidth(0.5);
-      doc.line(20, 87, 70, 87);
-
-      doc.setFontSize(9);
-      doc.setTextColor(75, 85, 99);
-      
+      doc.setTextColor(...primary);
+      doc.setFontSize(10);
+      doc.text('Service Snapshot', margin + leftColW + 8, y + 7);
+      doc.setTextColor(...muted);
       doc.setFont('helvetica', 'bold');
-      doc.text('Name:', 20, 95);
-      doc.text('Phone:', 20, 102);
-      doc.text('Email:', 20, 109);
-      
+      doc.setFontSize(8.5);
+      doc.text('Status', margin + leftColW + 8, y + 16);
+      doc.text('Warranty', margin + leftColW + 8, y + 24);
+      doc.text('AMC', margin + leftColW + 8, y + 32);
+      doc.text('Technician', margin + leftColW + 8, y + 40);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(service.customer_name, 45, 95);
-      doc.text(service.customer_phone, 45, 102);
-      doc.text(service.customer_email || 'Not provided', 45, 109);
+      doc.setTextColor(...dark);
+      doc.text((service.status || 'pending').replace(/_/g, ' ').toUpperCase(), margin + leftColW + rightColW - 4, y + 16, { align: 'right' });
+      doc.text(service.warranty_status || 'N/A', margin + leftColW + rightColW - 4, y + 24, { align: 'right' });
+      doc.text(service.amc_status || 'N/A', margin + leftColW + rightColW - 4, y + 32, { align: 'right' });
+      doc.text(service.service_staff_name || 'Not assigned', margin + leftColW + rightColW - 4, y + 40, { align: 'right' });
 
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(75, 85, 99);
-      doc.text('Address:', 110, 95);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      
-      const addressLines = doc.splitTextToSize(service.customer_address || 'Not provided', 70);
-      doc.text(addressLines, 110, 102);
-
-      // Equipment Details
-      doc.setTextColor(16, 185, 129);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('EQUIPMENT DETAILS', 20, 125);
-
-      doc.setDrawColor(16, 185, 129);
-      doc.line(20, 127, 80, 127);
-
-      doc.setFontSize(9);
-      doc.setTextColor(75, 85, 99);
-      
-      const startY = 135;
-      const col1X = 20;
-      const col2X = 60;
-      const col3X = 110;
-      const col4X = 150;
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('Battery Model:', col1X, startY);
-      doc.text('Battery Serial:', col1X, startY + 7);
-      doc.text('Inverter Model:', col1X, startY + 14);
-      doc.text('Inverter Serial:', col1X, startY + 21);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(service.battery_model || 'N/A', col2X, startY);
-      doc.text(service.original_battery_serials || service.battery_serial || 'N/A', col2X, startY + 7);
-      doc.text(service.inverter_model || 'N/A', col2X, startY + 14);
-      doc.text(service.inverter_serial || 'N/A', col2X, startY + 21);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(75, 85, 99);
-      doc.text('Service Date:', col3X, startY);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(service.service_date ? formatDate(service.service_date) : formatDate(service.created_at), col4X, startY);
-
-      // Issue Description
-      doc.setTextColor(16, 185, 129);
-      doc.setFont('helvetica', 'bold');
-      doc.text('ISSUE DESCRIPTION', 20, 165);
-
-      doc.setDrawColor(16, 185, 129);
-      doc.line(20, 167, 85, 167);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(9);
-      
-      const issueLines = doc.splitTextToSize(service.issue_description || 'No description provided', 170);
-      doc.text(issueLines, 20, 175);
-
-      const financialY = 175 + (issueLines.length * 5) + 10;
-      
-      // Financial Summary
-      doc.setTextColor(16, 185, 129);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('FINANCIAL SUMMARY', 20, financialY);
-
-      doc.setDrawColor(16, 185, 129);
-      doc.line(20, financialY + 2, 85, financialY + 2);
-
-      const tableY = financialY + 10;
-      
-      doc.setFillColor(16, 185, 129);
-      doc.rect(20, tableY - 5, 170, 6, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Description', 25, tableY - 1);
-      doc.text('Amount', 170, tableY - 1, { align: 'right' });
-
-      doc.setTextColor(75, 85, 99);
-      doc.setFont('helvetica', 'normal');
-      
-      const items = [
-        { desc: 'Estimated Cost', amount: formatCurrency(service.estimated_cost) },
-        { desc: 'Deposit Paid', amount: formatCurrency(service.deposit_amount || '0') },
-        { desc: 'Tax Amount', amount: formatCurrency(service.tax_amount || '0') },
-        { desc: 'Discount', amount: formatCurrency(service.discount_amount || '0') }
-      ];
-
-      items.forEach((item, index) => {
-        const y = tableY + 5 + (index * 5);
-        doc.text(item.desc, 25, y);
-        doc.text(item.amount, 170, y, { align: 'right' });
+      y += 52;
+      autoTable(doc, {
+        startY: y,
+        theme: 'grid',
+        head: [['Equipment Type', 'Model', 'Serial Number']],
+        body: [
+          ['Battery', service.original_battery_models || service.battery_model || 'N/A', service.original_battery_serials || service.battery_serial || 'N/A'],
+          ['Inverter', service.inverter_model || 'N/A', service.inverter_serial || 'N/A']
+        ],
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [15, 23, 42], lineColor: [226, 232, 240], lineWidth: 0.1 },
+        headStyles: { fillColor: [2, 132, 199], textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: { 0: { cellWidth: 32 }, 1: { cellWidth: 74 }, 2: { cellWidth: 76 } }
       });
 
-      const totalY = tableY + 5 + (items.length * 5) + 3;
-      doc.setDrawColor(200, 200, 200);
-      doc.line(20, totalY - 2, 190, totalY - 2);
-      
+      y = (doc as any).lastAutoTable.finalY + 8;
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(16, 185, 129);
-      doc.text('FINAL AMOUNT', 25, totalY);
-      doc.text(formatCurrency(service.final_cost || service.estimated_cost), 170, totalY, { align: 'right' });
-
-      if (service.payment_method) {
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(75, 85, 99);
-        doc.setFontSize(8);
-        doc.text(`Payment Method: ${service.payment_method}`, 20, totalY + 8);
-      }
-
-      const warrantyY = totalY + 15;
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(75, 85, 99);
-      doc.text('Warranty:', 20, warrantyY);
-      doc.text('AMC:', 100, warrantyY);
-      
+      doc.setTextColor(...primary);
+      doc.setFontSize(10);
+      doc.text('Issue Description', margin, y);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(margin, y + 3, contentWidth, 24, 2, 2, 'S');
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 0, 0);
-      doc.text(service.warranty_status || 'Standard Warranty', 50, warrantyY);
-      doc.text(service.amc_status || 'Not Enrolled', 120, warrantyY);
+      doc.setTextColor(...dark);
+      doc.setFontSize(8.5);
+      const issueLines = doc.splitTextToSize(service.issue_description || 'No issue description provided.', contentWidth - 8);
+      doc.text(issueLines, margin + 4, y + 9);
 
-      let finalY = warrantyY + 10;
-      
-      // Service Staff
-      if (service.service_staff_name) {
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(75, 85, 99);
-        doc.text('Service Staff:', 20, finalY);
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(0, 0, 0);
-        doc.text(service.service_staff_name, 60, finalY);
-        finalY += 7;
-      }
+      y += 34;
+      autoTable(doc, {
+        startY: y,
+        theme: 'plain',
+        body: [
+          ['Estimated Cost', formatCurrency(estimatedAmount.toString())],
+          ['Deposit Received', formatCurrency(depositAmount.toString())],
+          ['Tax', formatCurrency(taxAmount.toString())],
+          ['Discount', formatCurrency(discountAmount.toString())],
+          ['Final Amount', formatCurrency(finalAmount.toString())],
+          ['Balance Due', formatCurrency(balanceAmount.toString())]
+        ],
+        margin: { left: pageWidth - 86, right: margin },
+        styles: { fontSize: 9, cellPadding: 2, textColor: [15, 23, 42] },
+        columnStyles: {
+          0: { fontStyle: 'bold', halign: 'left', cellWidth: 45 },
+          1: { halign: 'right', cellWidth: 27 }
+        },
+        didParseCell: (hookData) => {
+          if (hookData.row.index >= 4) {
+            hookData.cell.styles.fillColor = [240, 249, 255];
+          }
+        }
+      });
 
-      // Notes
+      const totalsBottom = (doc as any).lastAutoTable.finalY;
+      doc.setFontSize(8.5);
+      doc.setTextColor(...muted);
+      doc.text(`Payment Method: ${service.payment_method || 'Not specified'}`, margin, totalsBottom - 12);
+      doc.text(`Claim Type: ${getClaimTypeLabel(service.battery_claim)}`, margin, totalsBottom - 5);
+
       if (service.notes) {
+        const notesY = Math.max(totalsBottom + 4, y + 10);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(75, 85, 99);
-        doc.text('Notes:', 20, finalY);
-        
+        doc.setTextColor(...primary);
+        doc.text('Service Notes', margin, notesY);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(margin, notesY + 3, contentWidth, 15, 2, 2, 'S');
         doc.setFont('helvetica', 'normal');
-        const noteLines = doc.splitTextToSize(service.notes, 170);
-        doc.text(noteLines, 20, finalY + 5);
-        finalY += noteLines.length * 5 + 10;
-      } else {
-        finalY += 5;
+        doc.setTextColor(...dark);
+        doc.setFontSize(8.2);
+        const notesLines = doc.splitTextToSize(service.notes, contentWidth - 8);
+        doc.text(notesLines, margin + 4, notesY + 8);
       }
 
-      // Footer
-      doc.setDrawColor(16, 185, 129);
-      doc.setLineWidth(0.5);
-      doc.line(20, 270, 190, 270);
-
-      doc.setFontSize(7);
-      doc.setTextColor(150, 150, 150);
-      doc.text('This is a computer generated receipt - valid without signature', 105, 278, { align: 'center' });
-      doc.text('Thank you for choosing Sun Powers Battery Service', 105, 283, { align: 'center' });
-      doc.text(`Generated on: ${formatDateTime(new Date().toISOString())}`, 105, 288, { align: 'center' });
+      doc.setDrawColor(2, 132, 199);
+      doc.line(margin, 280, pageWidth - margin, 280);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.text('This is a computer generated receipt. No signature required.', pageWidth / 2, 285, { align: 'center' });
+      doc.text('Thank you for choosing Sun Powers.', pageWidth / 2, 289, { align: 'center' });
 
       doc.save(`service_receipt_${service.service_code}_${new Date().toISOString().split('T')[0]}.pdf`);
-      
     } catch (error) {
       console.error('Receipt Generation Error:', error);
       alert('Error generating service receipt. Please try again.');
@@ -1061,6 +1012,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
   };
 
   const getEquipmentModel = (service: ServiceOrder) => {
+    if (service.original_battery_models) return service.original_battery_models;
     return service.battery_model || service.inverter_model || 'No equipment';
   };
 
@@ -1085,7 +1037,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         .filter(Boolean);
 
     const baseModel = service.battery_model || service.inverter_model || 'Equipment';
-    const models = parseList(service.battery_model || '');
+    const models = parseList(service.original_battery_models || service.battery_model || '');
     const serialSource = service.original_battery_serials || service.battery_serial || service.inverter_serial || '';
     const serials = parseList(serialSource);
 
@@ -1095,14 +1047,60 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
       return [{ model: baseModel, serial: 'N/A' }];
     }
 
+    const ids = parseList(service.original_battery_ids || '');
     return Array.from({ length: itemCount }).map((_, index) => ({
+      batteryId: ids[index] ? parseInt(ids[index]) : null,
       model: models[index] || models[0] || baseModel,
       serial: serials[index] || serials[0] || 'N/A'
     }));
   };
 
+  const getBatteryStatusMap = (service: ServiceOrder) => {
+    const byId: Record<number, string> = {};
+    const bySerial: Record<string, string> = {};
+    const raw = `${service.battery_statuses_json || ''}`.trim();
+    if (!raw) return { byId, bySerial };
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return { byId, bySerial };
+      parsed.forEach((entry: any) => {
+        const bid = parseInt(entry?.battery_id);
+        const serial = `${entry?.battery_serial || ''}`.trim().toLowerCase();
+        const status = `${entry?.service_status || ''}`.trim().toLowerCase();
+        if (!Number.isNaN(bid) && status) byId[bid] = status;
+        if (serial && status) bySerial[serial] = status;
+      });
+    } catch (_err) {
+      // Ignore malformed JSON
+    }
+    return { byId, bySerial };
+  };
+
+  const getBatteryClaimMap = (service: ServiceOrder) => {
+    const byId: Record<number, string> = {};
+    const bySerial: Record<string, string> = {};
+    const raw = `${service.battery_claims_json || ''}`.trim();
+    if (!raw) return { byId, bySerial };
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return { byId, bySerial };
+      parsed.forEach((entry: any) => {
+        const bid = parseInt(entry?.battery_id);
+        const serial = `${entry?.battery_serial || ''}`.trim().toLowerCase();
+        const claim = `${entry?.claim_type || ''}`.trim().toLowerCase();
+        if (!Number.isNaN(bid) && claim) byId[bid] = claim;
+        if (serial && claim) bySerial[serial] = claim;
+      });
+    } catch (_err) {
+      // Ignore malformed JSON
+    }
+    return { byId, bySerial };
+  };
+
   const renderEquipmentList = (service: ServiceOrder, compact: boolean = false) => {
     const items = getEquipmentItems(service);
+    const statusMap = getBatteryStatusMap(service);
+    const claimMap = getBatteryClaimMap(service);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? '4px' : '6px' }}>
         {items.map((item, index) => (
@@ -1121,6 +1119,24 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
             </div>
             <div style={{ fontSize: compact ? '10px' : '11px', color: '#64748b', fontFamily: 'monospace' }}>
               {item.serial}
+            </div>
+            <div style={{ marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#0369a1' }}>
+                Status: {(
+                  (item.batteryId && statusMap.byId[item.batteryId]) ||
+                  (item.serial ? statusMap.bySerial[item.serial.toLowerCase()] : '') ||
+                  service.status ||
+                  'pending'
+                ).replace(/_/g, ' ')}
+              </span>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: '#7c3aed' }}>
+                Claim: {getClaimTypeLabel(
+                  (item.batteryId && claimMap.byId[item.batteryId]) ||
+                  (item.serial ? claimMap.bySerial[item.serial.toLowerCase()] : '') ||
+                  service.battery_claim ||
+                  ''
+                )}
+              </span>
             </div>
           </div>
         ))}
@@ -1562,20 +1578,29 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
     );
   };
 
+  const deliveredCount = filteredData.filter(s => (s.status || '').toLowerCase() === 'delivered').length;
+  const inProgressCount = filteredData.filter(s => ['in_progress', 'testing', 'scheduled'].includes((s.status || '').toLowerCase())).length;
+  const pendingCount = filteredData.filter(s => ['pending', 'ready'].includes((s.status || '').toLowerCase())).length;
+
   return (
-    <div className="orders-section" style={{ padding: isMobile ? '12px' : '20px' }}>
+    <div className="orders-section" style={{ padding: isMobile ? '12px' : '20px', fontFamily: "'Poppins', 'Segoe UI', sans-serif" }}>
       {/* Section Header */}
       <div className="section-header" style={{
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
         alignItems: isMobile ? 'stretch' : 'center',
-        marginBottom: '24px',
-        gap: '16px'
+        marginBottom: '20px',
+        gap: '16px',
+        padding: isMobile ? '16px' : '20px',
+        borderRadius: '16px',
+        border: '1px solid #bae6fd',
+        background: 'linear-gradient(120deg, #0f766e 0%, #0284c7 55%, #0369a1 100%)',
+        boxShadow: '0 16px 30px rgba(3, 105, 161, 0.22)'
       }}>
         <div className="section-title">
-          <h2 style={{ fontSize: isMobile ? '1.2rem' : '1.5rem' }}>Service Orders</h2>
-          <p style={{ fontSize: isMobile ? '0.8rem' : '0.875rem' }}>
+          <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.7rem', color: '#f8fafc', margin: 0, letterSpacing: '0.2px' }}>Service Orders</h2>
+          <p style={{ fontSize: isMobile ? '0.82rem' : '0.92rem', color: '#e0f2fe', margin: '6px 0 0' }}>
             Showing {filteredData.length} of {services.length} service orders
           </p>
         </div>
@@ -1594,9 +1619,9 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                 style={{
                   flex: 1,
                   padding: '10px',
-                  background: showMobileSearch ? '#10b981' : '#f8fafc',
-                  color: showMobileSearch ? 'white' : '#1e293b',
-                  border: '1px solid #e2e8f0',
+                  background: showMobileSearch ? '#f8fafc' : 'rgba(255,255,255,0.12)',
+                  color: showMobileSearch ? '#0f766e' : '#f8fafc',
+                  border: '1px solid rgba(255,255,255,0.35)',
                   borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -1613,9 +1638,9 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                 style={{
                   flex: 1,
                   padding: '10px',
-                  background: showMobileFilters ? '#10b981' : '#f8fafc',
-                  color: showMobileFilters ? 'white' : '#1e293b',
-                  border: '1px solid #e2e8f0',
+                  background: showMobileFilters ? '#f8fafc' : 'rgba(255,255,255,0.12)',
+                  color: showMobileFilters ? '#0f766e' : '#f8fafc',
+                  border: '1px solid rgba(255,255,255,0.35)',
                   borderRadius: '8px',
                   display: 'flex',
                   alignItems: 'center',
@@ -1633,7 +1658,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
           {/* Search Box - Desktop */}
           {!isMobile && (
             <div className="search-wrapper" style={{ position: 'relative', minWidth: isTablet ? '200px' : '250px' }}>
-              <FiSearch className="search-icon" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <FiSearch className="search-icon" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#0f766e' }} />
               <input
                 type="text"
                 className="search-input"
@@ -1645,7 +1670,10 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                   paddingRight: '35px',
                   width: '100%',
                   padding: '10px 16px 10px 40px',
-                  fontSize: isTablet ? '0.8rem' : '0.875rem'
+                  fontSize: isTablet ? '0.8rem' : '0.875rem',
+                  border: '1px solid #a5f3fc',
+                  borderRadius: '10px',
+                  background: '#f0fdfa'
                 }}
               />
               {searchTerm && (
@@ -1659,7 +1687,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: '#94a3b8',
+                    color: '#0f766e',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -2074,6 +2102,26 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         </div>
       </div>
 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+        gap: '12px',
+        marginBottom: '16px'
+      }}>
+        <div style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #ecfeff, #cffafe)', border: '1px solid #a5f3fc' }}>
+          <div style={{ fontSize: '12px', color: '#0e7490', fontWeight: 600 }}>In Progress</div>
+          <div style={{ fontSize: '26px', color: '#155e75', fontWeight: 800, lineHeight: 1.1 }}>{inProgressCount}</div>
+        </div>
+        <div style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid #fdba74' }}>
+          <div style={{ fontSize: '12px', color: '#9a3412', fontWeight: 600 }}>Pending</div>
+          <div style={{ fontSize: '26px', color: '#7c2d12', fontWeight: 800, lineHeight: 1.1 }}>{pendingCount}</div>
+        </div>
+        <div style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)', border: '1px solid #86efac' }}>
+          <div style={{ fontSize: '12px', color: '#166534', fontWeight: 600 }}>Delivered</div>
+          <div style={{ fontSize: '26px', color: '#14532d', fontWeight: 800, lineHeight: 1.1 }}>{deliveredCount}</div>
+        </div>
+      </div>
+
       {/* Active Filters Bar */}
       {dateFilterType !== 'all' && !isMobile && (
         <div className="active-filters-bar" style={{
@@ -2138,10 +2186,11 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
 
       {/* Table/Card Container */}
       <div className="table-wrapper" style={{
-        border: '1px solid #e2e8f0',
-        borderRadius: '12px',
+        border: '1px solid #cbd5e1',
+        borderRadius: '16px',
         overflow: 'hidden',
-        background: 'white'
+        background: 'white',
+        boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)'
       }}>
         <div className="table-container" ref={tableContainerRef} style={{
           overflowX: 'auto',
@@ -2161,7 +2210,7 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                 width: '40px',
                 height: '40px',
                 border: '3px solid #e2e8f0',
-                borderTopColor: '#10b981',
+                borderTopColor: '#0284c7',
                 borderRadius: '50%',
                 animation: 'spin 1s linear infinite'
               }}></div>
@@ -2187,7 +2236,6 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Client Details</th>
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Equipment</th>
                       {!isTablet && <th style={{ padding: '16px' }}>Issue</th>}
-                      <th style={{ padding: isTablet ? '12px' : '16px' }}>Status</th>
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Priority</th>
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Payment</th>
                       <th style={{ padding: isTablet ? '12px' : '16px' }}>Amount</th>
@@ -2243,22 +2291,11 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
                               </div>
                             </td>
                             <td>
-                              <span className="issue-description" style={{ display: 'inline-block', maxWidth: '280px', lineHeight: 1.4, color: '#ffffff' }}>
+                              <span className="issue-description" style={{ display: 'inline-block', maxWidth: '280px', lineHeight: 1.4, color: '#0f172a' }}>
                                 {service.issue_description && service.issue_description.length > 50 
                                   ? `${service.issue_description.substring(0, 50)}...`
                                   : service.issue_description || 'No description'}
                               </span>
-                            </td>
-                            <td>
-                              <div className="status-cell">
-                                <div 
-                                  className="status-indicator"
-                                  style={{ backgroundColor: getStatusColor(service.status) }}
-                                ></div>
-                                <span className="status-label">
-                                  {service.status.replace(/_/g, ' ')}
-                                </span>
-                              </div>
                             </td>
                             <td>
                               <span 
@@ -2384,9 +2421,10 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               padding: isMobile ? '32px 16px' : '60px',
-              gap: '16px'
+              gap: '16px',
+              background: 'radial-gradient(circle at top, #f0fdfa, #ffffff 60%)'
             }}>
-              <FiShoppingBag className="empty-icon" style={{ fontSize: isMobile ? '40px' : '48px', color: '#94a3b8' }} />
+              <FiShoppingBag className="empty-icon" style={{ fontSize: isMobile ? '40px' : '48px', color: '#0ea5e9' }} />
               <h3 style={{ fontSize: isMobile ? '1.1rem' : '1.25rem' }}>No service orders found</h3>
               <p style={{ fontSize: isMobile ? '0.875rem' : '1rem' }}>Try adjusting your filters or create a new service order</p>
               {/* Removed the "New Service Order" button from empty state */}
@@ -2398,8 +2436,8 @@ const ServicesTab: React.FC<ServicesTabProps> = ({
         {filteredData.length > 0 && (
           <div className="pagination-container" style={{
             padding: isMobile ? '12px' : '16px',
-            borderTop: '1px solid #e2e8f0',
-            background: '#f8fafc'
+            borderTop: '1px solid #dbeafe',
+            background: 'linear-gradient(180deg, #f8fafc, #f0f9ff)'
           }}>
             <div className="pagination-info" style={{
               fontSize: isMobile ? '0.75rem' : '0.875rem',

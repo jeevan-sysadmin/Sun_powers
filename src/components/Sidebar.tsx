@@ -12,6 +12,7 @@ import {
   FiArrowLeft,
   FiShield,
   FiShieldOff,
+  FiDatabase,
   FiChevronLeft,
   FiChevronRight,
   FiLogOut
@@ -57,7 +58,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     { icon: <FiArrowRight />, label: 'Sun Powers → Company', id: 'sun_powers_to_company' },
     { icon: <FiArrowLeft />, label: 'Company → Sun Powers', id: 'company_to_sun_powers' },
     { icon: <FiShield />, label: 'Shop Claims', id: 'shop_claims' },
-    { icon: <FiShieldOff />, label: 'Company Claims', id: 'company_claims' }
+    { icon: <FiShieldOff />, label: 'Company Claims', id: 'company_claims' },
+    { icon: <FiDatabase />, label: 'Backup', id: 'backup' }
   ]);
 
   return (

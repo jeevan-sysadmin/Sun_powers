@@ -12,10 +12,6 @@ import {
   FiCheckCircle,
   FiClock,
   FiAlertCircle,
-  FiShoppingBag,
-  FiBriefcase,
-  FiArrowRight,
-  FiArrowLeft,
   FiCheck,
   FiXCircle,
   FiTag,
@@ -177,21 +173,6 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
   };
 
-  // Get claim type details
-  const getClaimTypeDetails = (claimType: string) => {
-    switch (claimType?.toLowerCase()) {
-      case 'shop':
-        return { label: 'Shop', icon: FiShoppingBag, description: 'Shop claim', color: '#3B82F6' };
-      case 'company':
-        return { label: 'Company', icon: FiBriefcase, description: 'Company claim', color: '#8B5CF6' };
-      case 'suntocomp':
-        return { label: 'Sun to Company', icon: FiArrowRight, description: 'Sun Powers to Company', color: '#10B981' };
-      case 'comptosun':
-        return { label: 'Company to Sun', icon: FiArrowLeft, description: 'Company to Sun Powers', color: '#F59E0B' };
-      default:
-        return { label: claimType, icon: FiInfo, description: 'Unknown claim type', color: '#6B7280' };
-    }
-  };
 
   // ULTIMATE FIX: Get spare battery status - handles all edge cases
   const getSpareStatus = () => {
@@ -254,10 +235,6 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const statusDetails = getStatusColor(battery.status || 'active');
   const StatusIcon = statusDetails.icon;
   
-  // Get claim type details
-  const claimTypeDetails = getClaimTypeDetails(battery.claim_type || 'shop');
-  const ClaimTypeIcon = claimTypeDetails.icon;
-
   // Get spare status - using the ultimate fix function
   const isSpare = getSpareStatus();
 
@@ -271,14 +248,15 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // Modal styles based on screen size
   const modalContentStyle = {
-    maxWidth: isMobile ? "95%" : isTablet ? "90%" : "800px",
+    maxWidth: isMobile ? "96%" : isTablet ? "92%" : "920px",
     maxHeight: "90vh",
     overflowY: "auto" as const,
     margin: isMobile ? "10px" : "0",
     width: "100%",
-    backgroundColor: "white",
-    borderRadius: isMobile ? "16px 16px 0 0" : "16px",
-    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+    background: "linear-gradient(180deg, #f7fbff 0%, #ffffff 22%)",
+    borderRadius: isMobile ? "18px 18px 0 0" : "18px",
+    border: "1px solid #dbeafe",
+    boxShadow: "0 28px 48px rgba(15, 23, 42, 0.22)"
   };
 
   return (
@@ -294,7 +272,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        backgroundColor: "rgba(2, 6, 23, 0.64)",
         display: "flex",
         alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
@@ -327,7 +305,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               }
               .modal-content {
                 animation: slideUp 0.3s ease-out;
-                border-radius: 16px 16px 0 0 !important;
+                border-radius: 18px 18px 0 0 !important;
               }
             }
             
@@ -339,14 +317,14 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             
             @media (min-width: 1024px) {
               .modal-content {
-                max-width: 800px !important;
+                max-width: 920px !important;
               }
             }
             
             .detail-section {
-              background: #ffffff;
-              border: 1px solid #e2e8f0;
-              border-radius: 12px;
+              background: linear-gradient(180deg, #ffffff, #f8fbff);
+              border: 1px solid #dbeafe;
+              border-radius: 14px;
               padding: 16px;
             }
             
@@ -360,7 +338,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               display: flex;
               justify-content: space-between;
               padding: 8px 0;
-              border-bottom: 1px solid #f1f5f9;
+              border-bottom: 1px solid #e8f0fb;
             }
             
             .detail-item:last-child {
@@ -383,13 +361,13 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             }
             
             .detail-label {
-              color: #64748b;
+              color: #475569;
               font-size: 13px;
               font-weight: 500;
             }
             
             .detail-value {
-              color: #1e293b;
+              color: #0f172a;
               font-size: 14px;
               font-weight: 500;
               text-align: right;
@@ -408,12 +386,12 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: isMobile ? '16px' : '20px 24px',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid #bfdbfe',
           position: isMobile ? 'sticky' : 'static',
           top: 0,
-          backgroundColor: 'white',
+          background: 'linear-gradient(120deg, #0f6fff 0%, #0284c7 55%, #38bdf8 100%)',
           zIndex: 10,
-          borderRadius: isMobile ? '16px 16px 0 0' : '16px 16px 0 0'
+          borderRadius: isMobile ? '18px 18px 0 0' : '18px 18px 0 0'
         }}>
           <div className="modal-title">
             <h2 style={{ 
@@ -421,16 +399,16 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               alignItems: 'center',
               gap: '8px',
               fontSize: isMobile ? '1.2rem' : '1.5rem', 
-              fontWeight: '600', 
+              fontWeight: '700', 
               margin: '0 0 4px 0',
-              color: '#1f2937'
+              color: '#f8fafc'
             }}>
               <FiBattery size={isMobile ? 20 : 24} />
               Battery Details
             </h2>
             <p style={{ 
               fontSize: isMobile ? '0.75rem' : '0.875rem', 
-              color: '#6b7280', 
+              color: '#dbeafe', 
               margin: 0 
             }}>
               Battery Code: {battery.battery_code}
@@ -446,7 +424,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               border: 'none',
               cursor: 'pointer',
               fontSize: isMobile ? '20px' : '24px',
-              color: '#6b7280',
+              color: '#e2e8f0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -564,11 +542,6 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         <FiXCircle size={isMobile ? 12 : 14} /> NO
                       </span>
                     )}
-                    {!isMobile && (
-                      <small style={{ color: '#6B7280', fontSize: '10px' }}>
-                        (Raw: {JSON.stringify(battery.is_spare)})
-                      </small>
-                    )}
                   </div>
                 </span>
               </div>
@@ -666,56 +639,6 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <span className="detail-label">AMC Period:</span>
                 <span className="detail-value">
                   {battery.amc_period === "0" || battery.amc_period === "0 year" ? "No AMC" : battery.amc_period || 'N/A'}
-                </span>
-              </div>
-            </div>
-            
-            {/* Claim & Ownership */}
-            <div className="detail-section" style={{
-              gridColumn: isMobile ? '1' : 'span 1'
-            }}>
-              <h3 style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: isMobile ? '0.9rem' : '1rem',
-                fontWeight: '600',
-                color: '#334155',
-                marginBottom: '12px',
-                paddingBottom: '8px',
-                borderBottom: '2px solid #10b981'
-              }}>
-                <FiBriefcase size={isMobile ? 16 : 18} /> Claim & Ownership
-              </h3>
-              <div className="detail-item">
-                <span className="detail-label">Claim Type:</span>
-                <span className="detail-value">
-                  <span 
-                    className="status-badge"
-                    style={{ 
-                      backgroundColor: `${claimTypeDetails.color}20`,
-                      color: claimTypeDetails.color,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: isMobile ? '4px' : '6px',
-                      padding: isMobile ? '4px 8px' : '4px 12px',
-                      borderRadius: '20px',
-                      fontSize: isMobile ? '11px' : '12px',
-                      fontWeight: '600',
-                      border: `1px solid ${claimTypeDetails.color}30`
-                    }}
-                  >
-                    <ClaimTypeIcon size={isMobile ? 12 : 14} />
-                    {claimTypeDetails.label}
-                  </span>
-                </span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-label">Claim Description:</span>
-                <span className="detail-value">
-                  <small style={{ color: '#6B7280', fontSize: isMobile ? '11px' : '12px' }}>
-                    {claimTypeDetails.description}
-                  </small>
                 </span>
               </div>
             </div>
@@ -825,7 +748,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             gap: isMobile ? '12px' : '16px',
             marginTop: isMobile ? '20px' : '24px',
             paddingTop: isMobile ? '16px' : '0',
-            borderTop: isMobile ? '1px solid #e2e8f0' : 'none'
+            borderTop: isMobile ? '1px solid #dbeafe' : 'none'
           }}>
             <motion.button 
               className="btn outline"
@@ -836,11 +759,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 flex: isMobile ? 1 : 'none',
                 padding: isMobile ? '12px' : '10px 20px',
                 background: 'white',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
                 fontSize: isMobile ? '1rem' : '0.875rem',
-                fontWeight: '500',
-                color: '#4b5563',
+                fontWeight: '600',
+                color: '#334155',
                 cursor: 'pointer'
               }}
             >
@@ -857,11 +780,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               style={{
                 flex: isMobile ? 1 : 'none',
                 padding: isMobile ? '12px' : '10px 20px',
-                background: '#3b82f6',
+                background: 'linear-gradient(120deg, #0f6fff, #0284c7)',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 fontSize: isMobile ? '1rem' : '0.875rem',
-                fontWeight: '500',
+                fontWeight: '700',
                 color: 'white',
                 cursor: 'pointer',
                 display: 'flex',

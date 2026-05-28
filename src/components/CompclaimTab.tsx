@@ -75,6 +75,9 @@ interface CompanyClaim {
 }
 
 interface CompclaimTabProps {
+  batteries?: any[];
+  filteredBatteries?: any[];
+  loading?: boolean;
   onViewClaim?: (claim: CompanyClaim) => void;
   onDeleteClaim?: (id: number) => void;
   onRefresh?: () => void;
@@ -90,6 +93,9 @@ interface CompclaimTabProps {
 const API_BASE_URL = "http://localhost/sun_powers/api";
 
 const CompclaimTab: React.FC<CompclaimTabProps> = ({
+  batteries = [],
+  filteredBatteries = [],
+  loading: externalLoading = false,
   onViewClaim,
   onDeleteClaim,
   onRefresh,
@@ -237,6 +243,47 @@ const CompclaimTab: React.FC<CompclaimTabProps> = ({
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
 
+  const normalizeValue = (value: any): string => `${value ?? ''}`.trim().toLowerCase().replace(/\s+/g, '_');
+
+  const mapBatteryToClaim = (battery: any): CompanyClaim => ({
+    id: Number(battery.id || 0),
+    claim_code: battery.claim_code || battery.battery_code || `CC_${battery.id || 0}`,
+    service_order_id: Number(battery.service_order_id || 0) || null,
+    customer_id: Number(battery.customer_id || 0) || null,
+    customer_name: battery.customer_name || null,
+    customer_phone: battery.customer_phone || null,
+    customer_email: battery.customer_email || null,
+    customer_address: battery.customer_address || null,
+    battery_id: Number(battery.battery_id || battery.id || 0),
+    battery_model: battery.battery_model || '',
+    battery_serial: battery.battery_serial || '',
+    brand: battery.brand || '',
+    capacity: battery.capacity || '',
+    voltage: battery.voltage || '',
+    battery_type: battery.battery_type || '',
+    warranty_period: battery.warranty_period || '',
+    purchase_date: battery.purchase_date || '',
+    issue_description: battery.issue_description || '',
+    claim_type: normalizeValue(battery.claim_type || 'company'),
+    priority: normalizeValue(battery.priority || 'medium'),
+    status: normalizeValue(battery.status || 'pending'),
+    claim_date: battery.claim_date || battery.created_at || '',
+    expected_resolution_date: battery.expected_resolution_date || null,
+    resolution_notes: battery.resolution_notes || '',
+    warranty_status: normalizeValue(battery.warranty_status || 'in_warranty'),
+    service_code: battery.service_code || '',
+    estimated_cost: battery.estimated_cost || '0',
+    final_cost: battery.final_cost || '0',
+    service_staff_name: battery.service_staff_name || null,
+    replacement_battery_serial: battery.replacement_battery_serial || null,
+    source: 'service',
+    age_days: Number(battery.age_days || 0),
+    is_overdue: Boolean(battery.is_overdue),
+    spare_battery_id: battery.spare_battery_id ? Number(battery.spare_battery_id) : null,
+    spare_battery_model: battery.spare_battery_model || null,
+    spare_battery_type: battery.spare_battery_type || null
+  });
+
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
@@ -304,8 +351,17 @@ const CompclaimTab: React.FC<CompclaimTabProps> = ({
 
   // Load data on component mount
   useEffect(() => {
+    const hasExternalData = Array.isArray(batteries) && batteries.length > 0;
+    if (hasExternalData) {
+      const source = (Array.isArray(filteredBatteries) && filteredBatteries.length > 0) ? filteredBatteries : batteries;
+      setClaims(source.map(mapBatteryToClaim));
+      setLoading(Boolean(externalLoading));
+      setError(null);
+      return;
+    }
+
     loadCompanyClaims();
-  }, []);
+  }, [batteries, filteredBatteries, externalLoading]);
 
   // Date filter function
   const filterByDate = (claim: CompanyClaim) => {
